@@ -57,9 +57,11 @@ def test_unlocatable_timestamp_fails() -> None:
 def test_leakage_daily_future_invariance() -> None:
     raw = minutes(2)
     before = daily_variance(raw, "2024-01-01", "2024-01-02")
-    raw.loc[1440:, ["open", "high", "low", "close"]] *= 100
+    raw.loc[1440:, ["open", "high", "low", "close"]] *= np.exp(
+        np.arange(1440) * 0.001)[:, None]
     after = daily_variance(raw, "2024-01-01", "2024-01-02")
     pd.testing.assert_series_equal(before.iloc[0], after.iloc[0])
+    assert before.rv.iloc[1] != pytest.approx(after.rv.iloc[1])
 
 
 @pytest.mark.parametrize("horizon", [1, 5, 22])
