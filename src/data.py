@@ -14,7 +14,8 @@ def daily_variance(raw: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
     00:09, ..., 23:59. Day t's RV is available only after day t closes.
     Unlocatable timestamps reject the archive rather than silently lose rows.
     """
-    frame = raw.apply(pd.to_numeric, errors="coerce")
+    frame = (pd.DataFrame({column: pd.Series(dtype="float64") for column in COLUMNS})
+             if raw.empty else raw.apply(pd.to_numeric, errors="coerce"))
     stamp = frame["time"]
     us = stamp.where(stamp >= 10**14, stamp * 1000)
     frame["time"] = pd.to_datetime(us, unit="us", utc=True, errors="coerce")
