@@ -52,7 +52,7 @@ Mean test results; lower is better. QLIKE C = validation-smearing calibrated. Al
 <!-- stage3-results-end -->
 
 
-A reproducible forecasting-accuracy study comparing Chronos-Bolt with econometric baselines on crypto realized variance. Implementation follows AGENTS.md in six reviewed stages. **Stage 3: zero-shot Chronos-Bolt tiny and small evaluated; no fine-tuning.**
+A reproducible forecasting-accuracy study comparing Chronos-Bolt with econometric baselines on crypto realized variance. Implementation follows AGENTS.md in six reviewed stages. **Stage 4 complete: full and LoRA fine-tuning evaluated for both sizes with three seeds each.**
 
 ## Reproduce Stage 1
 
@@ -217,3 +217,53 @@ Every seed is scored separately by the existing shared evaluator, using its own 
 Family CIs resample the three seeds with replacement and resample 30-day circular time blocks, with the same sampled dates used jointly across all selected seeds and symbols, for 1,000 replications with seed 42. Each replica computes seed-specific RMSE before averaging seeds. These intervals include observed seed variation but condition on the trained models/calibration; three seeds provide limited evidence about the full training-randomness distribution.
 
 DM and the authoritative Stage 4 MCS use per-date losses averaged across seeds for each fine-tuning family. Thus the joint MCS has one candidate per size/mode, alongside the original five baselines and two zero-shot models, rather than treating seeds as 18 competing model choices. Raw/calibrated MCS are separate. MCS is omitted from per-seed diagnostics; use `stage4_mcs.csv` for family comparisons. Exact duplicate family loss paths share one MCS representative and receive identical membership, avoiding undefined tests between identical forecasts. All historical Stage 2/3 result files remain unchanged.
+
+
+### Stage 4 results
+
+All 18 runs completed; the [36 family-level result rows](results/stage4_finetune.csv) report three-seed mean metrics, seed standard deviations, seed/date bootstrap CIs, DM tests and joint MCS membership. [Per-seed results](results/stage4_per_seed.csv), [calibration factors](results/stage4_calibration.csv), [training history](results/stage4_training_history.csv), [costs](results/stage4_costs.csv), [data audit](results/stage4_data_audit.csv) and [joint MCS](results/stage4_mcs.csv) are committed. Historical Stage 2/3 files remain unchanged.
+
+Small full fine-tuning improves next-day raw/calibrated QLIKE and RMSE over both zero-shot small and HAR in both symbol groups. Longer horizons do not show a uniform gain: at h=22 all fine-tuned families have worse calibrated QLIKE than HAR, and held-out raw QLIKE is also worse than HAR. The limited three-epoch budget is not a claim of optimal fine-tuning. All three seeds are reported without selecting the best test result.
+
+Combined training time was 31.71 minutes. Peak training allocation was 978.15 MiB for small full fine-tuning, 416.78 MiB for small LoRA, and 229.29 MiB for tiny full fine-tuning. Trainable parameters are 8,652,672 / 47,718,016 for tiny/small full mode; 98,304 / 294,912 for rank 8; and 196,608 / 589,824 for rank 16. These are PyTorch allocations, excluding driver and other application memory. No gradient checkpointing was needed. All 18 checkpoints selected epochs 1–3, not epoch zero. No Stage 5 ablations were run.
+
+Means below are across seeds; lower is better. QLIKE C denotes the frozen validation-smearing calibration. Confidence intervals and seed variation are in the CSV.
+
+| Model | Group | h | RMSE | MAE | QLIKE raw | QLIKE C |
+|---|---|---:|---:|---:|---:|---:|
+| Chronos-Bolt-small-full | fit-eligible | 1 | 0.6087 | 0.4429 | 0.1544 | 0.2732 |
+| Chronos-Bolt-small-lora16 | fit-eligible | 1 | 0.6177 | 0.4488 | 0.1596 | 0.3134 |
+| Chronos-Bolt-small-lora8 | fit-eligible | 1 | 0.6202 | 0.4488 | 0.1593 | 0.3175 |
+| Chronos-Bolt-tiny-full | fit-eligible | 1 | 0.6392 | 0.4717 | 0.1891 | 0.3574 |
+| Chronos-Bolt-tiny-lora16 | fit-eligible | 1 | 0.6495 | 0.4770 | 0.1916 | 0.3896 |
+| Chronos-Bolt-tiny-lora8 | fit-eligible | 1 | 0.6458 | 0.4739 | 0.1885 | 0.3891 |
+| Chronos-Bolt-small-full | fit-eligible | 5 | 0.6359 | 0.4365 | 0.1448 | 0.2573 |
+| Chronos-Bolt-small-lora16 | fit-eligible | 5 | 0.6332 | 0.4332 | 0.1425 | 0.2716 |
+| Chronos-Bolt-small-lora8 | fit-eligible | 5 | 0.6391 | 0.4360 | 0.1432 | 0.2744 |
+| Chronos-Bolt-tiny-full | fit-eligible | 5 | 0.6327 | 0.4292 | 0.1419 | 0.2641 |
+| Chronos-Bolt-tiny-lora16 | fit-eligible | 5 | 0.6410 | 0.4341 | 0.1427 | 0.2761 |
+| Chronos-Bolt-tiny-lora8 | fit-eligible | 5 | 0.6400 | 0.4334 | 0.1423 | 0.2778 |
+| Chronos-Bolt-small-full | fit-eligible | 22 | 0.7339 | 0.5226 | 0.1888 | 0.3687 |
+| Chronos-Bolt-small-lora16 | fit-eligible | 22 | 0.7158 | 0.5068 | 0.1770 | 0.3360 |
+| Chronos-Bolt-small-lora8 | fit-eligible | 22 | 0.7238 | 0.5115 | 0.1791 | 0.3375 |
+| Chronos-Bolt-tiny-full | fit-eligible | 22 | 0.7275 | 0.5158 | 0.1812 | 0.3387 |
+| Chronos-Bolt-tiny-lora16 | fit-eligible | 22 | 0.7306 | 0.5153 | 0.1804 | 0.3301 |
+| Chronos-Bolt-tiny-lora8 | fit-eligible | 22 | 0.7362 | 0.5201 | 0.1828 | 0.3388 |
+| Chronos-Bolt-small-full | held-out | 1 | 0.5957 | 0.4280 | 0.1456 | 0.2610 |
+| Chronos-Bolt-small-lora16 | held-out | 1 | 0.6017 | 0.4332 | 0.1496 | 0.3018 |
+| Chronos-Bolt-small-lora8 | held-out | 1 | 0.6033 | 0.4332 | 0.1494 | 0.3086 |
+| Chronos-Bolt-tiny-full | held-out | 1 | 0.6225 | 0.4549 | 0.1737 | 0.3265 |
+| Chronos-Bolt-tiny-lora16 | held-out | 1 | 0.6341 | 0.4631 | 0.1769 | 0.3595 |
+| Chronos-Bolt-tiny-lora8 | held-out | 1 | 0.6293 | 0.4589 | 0.1729 | 0.3567 |
+| Chronos-Bolt-small-full | held-out | 5 | 0.6201 | 0.4259 | 0.1363 | 0.2394 |
+| Chronos-Bolt-small-lora16 | held-out | 5 | 0.6149 | 0.4204 | 0.1339 | 0.2553 |
+| Chronos-Bolt-small-lora8 | held-out | 5 | 0.6189 | 0.4224 | 0.1345 | 0.2610 |
+| Chronos-Bolt-tiny-full | held-out | 5 | 0.6181 | 0.4190 | 0.1336 | 0.2396 |
+| Chronos-Bolt-tiny-lora16 | held-out | 5 | 0.6266 | 0.4240 | 0.1353 | 0.2533 |
+| Chronos-Bolt-tiny-lora8 | held-out | 5 | 0.6256 | 0.4240 | 0.1346 | 0.2526 |
+| Chronos-Bolt-small-full | held-out | 22 | 0.6632 | 0.4794 | 0.1579 | 0.3060 |
+| Chronos-Bolt-small-lora16 | held-out | 22 | 0.6526 | 0.4629 | 0.1504 | 0.2815 |
+| Chronos-Bolt-small-lora8 | held-out | 22 | 0.6570 | 0.4659 | 0.1517 | 0.2886 |
+| Chronos-Bolt-tiny-full | held-out | 22 | 0.6682 | 0.4716 | 0.1546 | 0.2845 |
+| Chronos-Bolt-tiny-lora16 | held-out | 22 | 0.6692 | 0.4710 | 0.1538 | 0.2770 |
+| Chronos-Bolt-tiny-lora8 | held-out | 22 | 0.6758 | 0.4772 | 0.1564 | 0.2831 |
