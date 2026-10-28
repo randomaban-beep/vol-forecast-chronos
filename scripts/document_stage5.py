@@ -75,7 +75,10 @@ Regimes use each symbol/horizon's training-only 90th percentile of sqrt(mean RV)
 the rest. Held-out histories define only their retrospective regime thresholds.
 The [regime table](results/stage5_regimes.csv) compares HAR, HAR-weekday and the frozen
 fine-tuned family. Conditional CIs resample whole calendar blocks and divide sampled
-loss totals by sampled observation counts. Empty regime dates remain zero-padded
+loss totals by sampled observation counts. Bootstrap replications with no qualifying
+observations are excluded, with the
+number of usable replications recorded. CIs condition on a nonempty resample.
+Empty regime dates remain zero-padded
 for calendar-aware DM/HAC and MCS; the common count normalization preserves conditional
 mean loss differences. Regime MCS uses just these three families. Thresholds and
 sample counts are saved separately; future targets never set thresholds.
@@ -108,6 +111,9 @@ No small-model run is extended, and no Stage 4 number or frozen headline is repl
     text += f'{costs.reused_from.notna().sum()} runs reused Stage 4. Peak training allocation was '
     text += f'{new.gpu_training_peak_mb.max():.0f} MiB on {", ".join(new.device.unique())}. '
     text += 'Per-run costs, best epochs, inference times and raw histories are in the Stage 5 CSVs. '
+    cap_hits = int(new.loc[~new.extended_budget, 'best_epoch'].eq(3).sum())
+    text += f'{cap_hits} new small-model ablation runs selected the three-epoch cap; '
+    text += 'these fixed-budget curves do not establish convergence. Only the approved Stage 4 tiny family was extended. '
     text += f'All {len(preservation)} historical result files were verified byte-identical by SHA-256. '
     text += 'Full reproduction from raw data also requires the earlier-stage commands and their runtime.\n'
     readme = Path('README.md')

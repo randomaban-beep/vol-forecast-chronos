@@ -75,10 +75,20 @@ def error_analysis(scored: pd.DataFrame, selection: pd.DataFrame, daily: pd.Data
             f'{change:.2f} times the previous day. The mean log forecast implied RV {predicted_rv:.6g} '
             f'and {direction} realized variance by a factor of {max(actual_rv/predicted_rv, predicted_rv/actual_rv):.2f}. '
             f'The abrupt change from the observed history explains the large one-day error; the model had no future '
-            f'price or news inputs. This describes the measured volatility move, not a verified external cause. '
+            f'price or news inputs. Daily RV alone cannot identify the cause of the move. '
             f'Mean seed squared log error: {row.mean_seed_squared_error:.3f}.')
     worst.to_csv(results / 'stage5_worst_forecasts.csv', index=False)
-    Path('data/stage5/error_analysis.md').write_text('\n\n'.join(descriptions)+'\n', encoding='utf-8')
+    context = ''
+    if worst.target_end.dt.strftime('%Y-%m-%d').eq('2025-10-10').all():
+        url = 'https://www.binance.com/en/support/announcement/detail/d9cb0d52d7c142a5be4f49732bd8760c'
+        context = ('All three cases coincide with the same market event. Binance reported a broad sell-off '
+            'and extreme volatility on 2025-10-10 between 20:50 and 22:00 UTC '
+            f'([exchange statement, published October 12]({url})). This retrospective context is consistent '
+            'with a common shock absent from the log-RV-only inputs; it does not establish each coin\'s causal mechanism.\n\n')
+        pd.DataFrame([dict(date='2025-10-10', source_url=url, publication_date='2025-10-12',
+            scope='Retrospective exchange account of broad market sell-off; not a model input')]).to_csv(
+                results / 'stage5_event_context.csv', index=False)
+    Path('data/stage5/error_analysis.md').write_text(context+'\n\n'.join(descriptions)+'\n', encoding='utf-8')
 
 
 def main() -> None:

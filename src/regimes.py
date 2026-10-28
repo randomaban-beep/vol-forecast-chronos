@@ -14,7 +14,7 @@ def regime_thresholds(examples: pd.DataFrame) -> pd.DataFrame:
     return train.groupby(['symbol', 'horizon']).volatility.quantile(.9).rename('threshold').reset_index()
 
 
-def conditional_statistics(sums: np.ndarray, counts: np.ndarray, config: dict) -> tuple[np.ndarray, np.ndarray]:
+def conditional_statistics(sums: np.ndarray, counts: np.ndarray, config: dict) -> tuple[np.ndarray, np.ndarray, int]:
     """Seed-mean conditional metrics and CIs resampling full calendar blocks.
 
     sums axes are seed,date,loss. Zero-observation dates remain present; sampled
@@ -32,9 +32,11 @@ def conditional_statistics(sums: np.ndarray, counts: np.ndarray, config: dict) -
     chosen = rng.integers(seeds, size=(reps, seeds))
     denominator = counts[indices].sum(axis=1)
     valid = denominator > 0
+    if valid.sum() < 2:
+        raise ValueError('Too few nonempty bootstrap replications')
     boot = sums[chosen[:, :, None], indices[:, None, :]].sum(axis=2)[valid] / denominator[valid, None, None]
     boot[:, :, 0] = np.sqrt(boot[:, :, 0])
-    return estimate.mean(axis=0), np.quantile(boot.mean(axis=1), [.025, .975], axis=0)
+    return estimate.mean(axis=0), np.quantile(boot.mean(axis=1), [.025, .975], axis=0), int(valid.sum())
 
 
 def analyze_regimes(scored: pd.DataFrame, thresholds: pd.DataFrame, selection: pd.DataFrame,
@@ -63,9 +65,10 @@ def analyze_regimes(scored: pd.DataFrame, thresholds: pd.DataFrame, selection: p
                 for column, metric in [(2, 'qlike'), (3, 'qlike_raw')]}
             memberships = {metric: family_mcs(losses, config) for metric, losses in panels.items()}
             for family, sums in all_sums.items():
-                mean, ci = conditional_statistics(sums, counts, config)
+                mean, ci, nonempty = conditional_statistics(sums, counts, config)
                 row = dict(symbol_group=group, horizon=h, regime='top_decile' if high else 'rest', model=family,
-                    n_forecasts_per_seed=int(counts.sum()), n_calendar_dates=len(dates), n_nonempty_dates=int((counts > 0).sum()))
+                    n_forecasts_per_seed=int(counts.sum()), n_calendar_dates=len(dates), n_nonempty_dates=int((counts > 0).sum()),
+                    bootstrap_reps_nonempty=nonempty, bootstrap_reps_requested=config['bootstrap_reps'])
                 for i, metric in enumerate(['rmse', 'mae', 'qlike', 'qlike_raw']):
                     row.update({metric: mean[i], metric+'_lo': ci[0, i], metric+'_hi': ci[1, i]})
                 for metric, losses in panels.items():

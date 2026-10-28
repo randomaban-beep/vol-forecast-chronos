@@ -14,18 +14,24 @@ def main() -> None:
     root, old, results = Path('data/stage5'), Path('data/stage4'), Path('results')
     template = common_template(pd.read_parquet('data/stage2_predictions.parquet'))
     costs = pd.read_csv(results / 'stage5_run_costs.csv')
+    base_config = yaml.safe_load(Path('configs/stage-4-finetune.yaml').read_text())
+    daily = pd.read_parquet('data/daily_rv.parquet')
+    original_fingerprint = hashlib.sha256(yaml.safe_dump(base_config, sort_keys=True).encode() +
+        pd.util.hash_pandas_object(daily, index=False).to_numpy().tobytes()).hexdigest()
     audit = []
     for row in costs.itertuples():
         predictions = pd.read_parquet(root / f'{row.model}_predictions.parquet')
         pd.testing.assert_frame_equal(predictions[template.columns], template)
         reused_equal = False
         if pd.notna(row.reused_from):
+            original_cost = pd.read_parquet(old / f'{row.reused_from}_cost.parquet').iloc[0]
+            assert original_cost.input_config_sha256 == original_fingerprint
             original = pd.read_parquet(old / f'{row.reused_from}_predictions.parquet')
             np.testing.assert_array_equal(predictions.prediction.to_numpy(), original.prediction.to_numpy())
             reused_equal = True
         audit.append(dict(model=row.model, rows=len(predictions), common_panel_identical=True,
                           reused_prediction_identical=reused_equal if pd.notna(row.reused_from) else None))
-    assert len(costs) == 54 and costs.extended_budget.sum() == 3
+    assert len(costs) == costs.model.nunique() == 54 and costs.extended_budget.sum() == 3
     weekday = pd.read_parquet(root / 'weekday_predictions.parquet')
     pd.testing.assert_frame_equal(weekday[template.columns], template)
     pd.DataFrame(audit).to_csv(results / 'stage5_panel_audit.csv', index=False)

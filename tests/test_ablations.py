@@ -52,7 +52,17 @@ def test_regime_threshold_uses_training_only():
 def test_conditional_bootstrap_preserves_empty_calendar_dates():
     counts = np.array([1., 0., 2., 0.])
     sums = np.tile(counts[None, :, None] * np.array([4., 2., 3., 1.]), (3, 1, 1))
-    mean, ci = conditional_statistics(sums, counts, {'seed': 42, 'block_length': 2, 'bootstrap_reps': 100})
+    mean, ci, valid = conditional_statistics(sums, counts, {'seed': 42, 'block_length': 2, 'bootstrap_reps': 100})
+    np.testing.assert_allclose(mean, [2., 2., 3., 1.])
+    np.testing.assert_allclose(ci, [[2., 2., 3., 1.]]*2)
+    assert valid == 100
+
+
+def test_sparse_regime_reports_nonempty_bootstrap_count():
+    counts = np.array([1., 0., 0., 0.])
+    sums = counts[None, :, None] * np.array([4., 2., 3., 1.])
+    mean, ci, valid = conditional_statistics(sums, counts, {'seed': 42, 'block_length': 1, 'bootstrap_reps': 1000})
+    assert 2 < valid < 1000
     np.testing.assert_allclose(mean, [2., 2., 3., 1.])
     np.testing.assert_allclose(ci, [[2., 2., 3., 1.]]*2)
 

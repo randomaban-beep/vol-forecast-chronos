@@ -44,6 +44,14 @@ def main() -> None:
     grid.merge(aggregate.loc[~extended], left_on='family', right_on='model', validate='many_to_many').to_csv(
         results / 'stage5_ablation_summary.csv', index=False)
     weekday = add_weekday_dm(summary.loc[summary.model.eq('HAR-weekday')], scored)
+    weekday_predictions = predictions.loc[predictions.model.eq('HAR-weekday')]
+    weekday_cost = dict(model='HAR-weekday', trainable_parameters=10,
+        fit_seconds=pd.read_csv(results / 'stage5_weekday_fit_audit.csv').fit_seconds.sum(),
+        inference_ms_per_1000=weekday_predictions.inference_seconds.mean()*1e6, gpu_memory_mb=0)
+    pd.DataFrame([weekday_cost]).to_csv(results / 'stage5_weekday_costs.csv', index=False)
+    for key, value in weekday_cost.items():
+        if key != 'model':
+            weekday[key] = value
     for metric in ['qlike', 'qlike_raw']:
         membership = mcs.loc[mcs.model.eq('HAR-weekday') & mcs.metric.eq(metric),
             ['symbol_group', 'horizon', 'mcs_pvalue', 'mcs_95_included']].rename(columns={
