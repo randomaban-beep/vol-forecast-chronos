@@ -1,0 +1,28 @@
+seeds: [42, 43, 44]
+seed: 42
+context_length: 256
+prediction_length: 22
+batch_size: 32
+max_epochs: 3
+patience: 1
+min_delta: 0.00001
+full_learning_rate: 0.00001
+lora_learning_rate: 0.0001
+weight_decay: 0.01
+gradient_clip: 1.0
+lora_dropout: 0.05
+lora_targets: [q, v]
+modes: [full, lora8, lora16]
+held_out: [SOLUSDT, DOGEUSDT]
+horizons: [1, 5, 22]
+bootstrap_reps: 1000
+block_length: 30
+cache: data
+results: results
+models:
+  - name: Chronos-Bolt-tiny
+    id: amazon/chronos-bolt-tiny
+    revision: a0e552de83495b5c28c14c71c374f3e33280b340
+  - name: Chronos-Bolt-small
+    id: amazon/chronos-bolt-small
+    revision: 772f3d25d38aec6d914c8949dab4462e2d46f5d8

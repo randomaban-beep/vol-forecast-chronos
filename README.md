@@ -52,7 +52,7 @@ Mean test results; lower is better. QLIKE C = validation-smearing calibrated. Al
 <!-- stage3-results-end -->
 
 
-A reproducible forecasting-accuracy study comparing Chronos-Bolt with econometric baselines on crypto realized variance. Implementation follows AGENTS.md in six reviewed stages. **Stage 3: zero-shot Chronos-Bolt tiny and small evaluated; no fine-tuning.**
+A reproducible forecasting-accuracy study comparing Chronos-Bolt with econometric baselines on crypto realized variance. Implementation follows AGENTS.md in six reviewed stages. **Stage 4 complete: full and LoRA fine-tuning evaluated for both sizes with three seeds each.**
 
 ## Reproduce Stage 1
 
@@ -186,3 +186,84 @@ Both models ran on the **NVIDIA GeForce RTX 3050 6GB Laptop GPU**, CUDA PyTorch 
 [Full costs and revisions](results/stage3_costs.csv). Timing uses CUDA synchronization and includes batch transfers, model inference and median extraction, but excludes download/load, warmup, context construction and evaluation. Each path is reused for eligible h=1/5/22 rows; both scalar and full-path rates are reported. Memory includes weights and inference allocations recorded by PyTorch, not CUDA-driver overhead, other applications or total device usage. Model load times with downloaded checkpoints were about 0.65/0.84 seconds. No other GPU processes were stopped.
 
 Tiny and small improve next-day raw QLIKE over HAR in both groups; small also improves next-day calibrated QLIKE. Longer-horizon conclusions differ by metric and calibration: neither model uniformly beats HAR, and calibrated QLIKE on held-out symbols is worse at h=5 and h=22. All reported p-values are unadjusted pairwise tests; consult the joint MCS and CIs. The full suite has 54 passing tests, including exact common-panel alignment, future-context invariance, known-input path aggregation, byte preservation and the pinned library's NaN mask behavior.
+
+
+## Stage 4: full fine-tuning and LoRA
+
+Run after installing the Stage 3 CUDA environment:
+
+```powershell
+.venv\Scripts\python -m pip install -e ".[test,zero-shot,finetune]"
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python scripts/run_finetune.py --reuse-runs
+```
+
+`configs/stage-4-finetune.yaml` fixes three seeds (42, 43, 44), full fine-tuning and LoRA ranks 8/16 for tiny first and then small. The runner rebuilds missing prerequisite forecast caches into ignored result directories, preserving historical published Stage 2/3 rows and costs. Completed runs may be reused only when their full input/config fingerprint matches. Omitting `--reuse-runs` retrains all runs. Checkpoints and tensor/forecast intermediates remain under ignored `data/stage4/`; no model weights are committed.
+
+### Training and selection protocol
+
+Each training example contains 256 daily log-RV calendar slots followed by a 22-day daily log-RV target path. Context gaps remain NaN and use Chronos-Bolt's native mask. Target paths must be complete. Requiring a full 256-day calendar history creates a burn-in: the first training target starts on 2020-09-13. There are 5,890 training windows with targets ending no later than 2023-12-31, and 2,070 validation windows wholly within 2024. Only BTC, ETH, BNB, XRP, ADA and LTC enter either set. SOL/DOGE never enter weight training, checkpoint selection or smearing calibration. See the generated `stage4_data_audit.csv`.
+
+Training minimizes the model's native context-normalized multi-quantile pinball loss on the 22-day path, with unused output days masked by the library. Evaluation retains Stage 3's marginal-median path conversion: log(mean(exp(path[:h]))) for h=1/5/22. No horizon-specific fine-tuning objective or test-based hyperparameter search is introduced.
+
+Hyperparameters are fixed before scoring: AdamW, full-model learning rate 1e-5, LoRA learning rate 1e-4, weight decay 0.01, gradient clipping at 1, batch size 32, at most 3 epochs. LoRA uses PEFT 0.14.0 with attention query/value projections (`q`, `v`), alpha=2*rank, dropout=0.05 and no trained biases. Full mode trains every model parameter; LoRA freezes all original weights. Float32 master weights use CUDA bfloat16 autocast on this device (fp16 plus gradient scaling when bfloat16 is unavailable); inference uses fp16 as in Stage 3. CPU fallback uses float32. Gradient checkpointing is unnecessary when measured memory fits the laptop.
+
+At epoch 0 and after each training epoch, evaluate the six-symbol validation loss. Select the lowest loss with minimum improvement 1e-5; stop after one non-improving epoch. The unchanged pretrained checkpoint is a valid epoch-zero candidate. Selected weights are frozen before any test inference and used once over the complete common panel; no test-period refits. Validation is reused for early stopping and smearing calibration, so it is not independent generalization evidence. Training histories record checkpoint improvements, and the cost table identifies the final best epoch for each run.
+
+### Three-seed reporting
+
+Every seed is scored separately by the existing shared evaluator, using its own frozen six-symbol 2024 smearing factors. Both raw/calibrated QLIKE, log RMSE/MAE, DM versus original HAR, and block-bootstrap intervals are retained in per-seed results. Family-level headline values are the **mean of the three seed-specific metrics**, not a selected seed, an ensemble prediction, or the square root of mean seed MSE. The seed standard deviation is also reported.
+
+Family CIs resample the three seeds with replacement and resample 30-day circular time blocks, with the same sampled dates used jointly across all selected seeds and symbols, for 1,000 replications with seed 42. Each replica computes seed-specific RMSE before averaging seeds. These intervals include observed seed variation but condition on the trained models/calibration; three seeds provide limited evidence about the full training-randomness distribution.
+
+DM and the authoritative Stage 4 MCS use per-date losses averaged across seeds for each fine-tuning family. Thus the joint MCS has one candidate per size/mode, alongside the original five baselines and two zero-shot models, rather than treating seeds as 18 competing model choices. Raw/calibrated MCS are separate. MCS is omitted from per-seed diagnostics; use `stage4_mcs.csv` for family comparisons. Exact duplicate family loss paths share one MCS representative and receive identical membership, avoiding undefined tests between identical forecasts. All historical Stage 2/3 result files remain unchanged.
+
+
+### Stage 4 results
+
+All 18 runs completed; the [36 family-level result rows](results/stage4_finetune.csv) report three-seed mean metrics, seed standard deviations, seed/date bootstrap CIs, DM tests and joint MCS membership. [Per-seed results](results/stage4_per_seed.csv), [calibration factors](results/stage4_calibration.csv), [training history](results/stage4_training_history.csv), [costs](results/stage4_costs.csv), [data audit](results/stage4_data_audit.csv) and [joint MCS](results/stage4_mcs.csv) are committed. Historical Stage 2/3 files remain unchanged.
+
+Small full fine-tuning improves next-day raw/calibrated QLIKE and RMSE over both zero-shot small and HAR in both symbol groups. Longer horizons do not show a uniform gain: at h=22 all fine-tuned families have worse calibrated QLIKE than HAR, and held-out raw QLIKE is also worse than HAR. The limited three-epoch budget is not a claim of optimal fine-tuning. All three seeds are reported without selecting the best test result.
+
+Combined training time was 31.71 minutes. Peak training allocation was 978.15 MiB for small full fine-tuning, 416.78 MiB for small LoRA, and 229.29 MiB for tiny full fine-tuning. Trainable parameters are 8,652,672 / 47,718,016 for tiny/small full mode; 98,304 / 294,912 for rank 8; and 196,608 / 589,824 for rank 16. These are PyTorch allocations, excluding driver and other application memory. No gradient checkpointing was needed. All 18 checkpoints selected epochs 1–3, not epoch zero. No Stage 5 ablations were run.
+
+Means below are across seeds; lower is better. QLIKE C denotes the frozen validation-smearing calibration. Confidence intervals and seed variation are in the CSV.
+
+| Model | Group | h | RMSE | MAE | QLIKE raw | QLIKE C |
+|---|---|---:|---:|---:|---:|---:|
+| Chronos-Bolt-small-full | fit-eligible | 1 | 0.6087 | 0.4429 | 0.1544 | 0.2732 |
+| Chronos-Bolt-small-lora16 | fit-eligible | 1 | 0.6177 | 0.4488 | 0.1596 | 0.3134 |
+| Chronos-Bolt-small-lora8 | fit-eligible | 1 | 0.6202 | 0.4488 | 0.1593 | 0.3175 |
+| Chronos-Bolt-tiny-full | fit-eligible | 1 | 0.6392 | 0.4717 | 0.1891 | 0.3574 |
+| Chronos-Bolt-tiny-lora16 | fit-eligible | 1 | 0.6495 | 0.4770 | 0.1916 | 0.3896 |
+| Chronos-Bolt-tiny-lora8 | fit-eligible | 1 | 0.6458 | 0.4739 | 0.1885 | 0.3891 |
+| Chronos-Bolt-small-full | fit-eligible | 5 | 0.6359 | 0.4365 | 0.1448 | 0.2573 |
+| Chronos-Bolt-small-lora16 | fit-eligible | 5 | 0.6332 | 0.4332 | 0.1425 | 0.2716 |
+| Chronos-Bolt-small-lora8 | fit-eligible | 5 | 0.6391 | 0.4360 | 0.1432 | 0.2744 |
+| Chronos-Bolt-tiny-full | fit-eligible | 5 | 0.6327 | 0.4292 | 0.1419 | 0.2641 |
+| Chronos-Bolt-tiny-lora16 | fit-eligible | 5 | 0.6410 | 0.4341 | 0.1427 | 0.2761 |
+| Chronos-Bolt-tiny-lora8 | fit-eligible | 5 | 0.6400 | 0.4334 | 0.1423 | 0.2778 |
+| Chronos-Bolt-small-full | fit-eligible | 22 | 0.7339 | 0.5226 | 0.1888 | 0.3687 |
+| Chronos-Bolt-small-lora16 | fit-eligible | 22 | 0.7158 | 0.5068 | 0.1770 | 0.3360 |
+| Chronos-Bolt-small-lora8 | fit-eligible | 22 | 0.7238 | 0.5115 | 0.1791 | 0.3375 |
+| Chronos-Bolt-tiny-full | fit-eligible | 22 | 0.7275 | 0.5158 | 0.1812 | 0.3387 |
+| Chronos-Bolt-tiny-lora16 | fit-eligible | 22 | 0.7306 | 0.5153 | 0.1804 | 0.3301 |
+| Chronos-Bolt-tiny-lora8 | fit-eligible | 22 | 0.7362 | 0.5201 | 0.1828 | 0.3388 |
+| Chronos-Bolt-small-full | held-out | 1 | 0.5957 | 0.4280 | 0.1456 | 0.2610 |
+| Chronos-Bolt-small-lora16 | held-out | 1 | 0.6017 | 0.4332 | 0.1496 | 0.3018 |
+| Chronos-Bolt-small-lora8 | held-out | 1 | 0.6033 | 0.4332 | 0.1494 | 0.3086 |
+| Chronos-Bolt-tiny-full | held-out | 1 | 0.6225 | 0.4549 | 0.1737 | 0.3265 |
+| Chronos-Bolt-tiny-lora16 | held-out | 1 | 0.6341 | 0.4631 | 0.1769 | 0.3595 |
+| Chronos-Bolt-tiny-lora8 | held-out | 1 | 0.6293 | 0.4589 | 0.1729 | 0.3567 |
+| Chronos-Bolt-small-full | held-out | 5 | 0.6201 | 0.4259 | 0.1363 | 0.2394 |
+| Chronos-Bolt-small-lora16 | held-out | 5 | 0.6149 | 0.4204 | 0.1339 | 0.2553 |
+| Chronos-Bolt-small-lora8 | held-out | 5 | 0.6189 | 0.4224 | 0.1345 | 0.2610 |
+| Chronos-Bolt-tiny-full | held-out | 5 | 0.6181 | 0.4190 | 0.1336 | 0.2396 |
+| Chronos-Bolt-tiny-lora16 | held-out | 5 | 0.6266 | 0.4240 | 0.1353 | 0.2533 |
+| Chronos-Bolt-tiny-lora8 | held-out | 5 | 0.6256 | 0.4240 | 0.1346 | 0.2526 |
+| Chronos-Bolt-small-full | held-out | 22 | 0.6632 | 0.4794 | 0.1579 | 0.3060 |
+| Chronos-Bolt-small-lora16 | held-out | 22 | 0.6526 | 0.4629 | 0.1504 | 0.2815 |
+| Chronos-Bolt-small-lora8 | held-out | 22 | 0.6570 | 0.4659 | 0.1517 | 0.2886 |
+| Chronos-Bolt-tiny-full | held-out | 22 | 0.6682 | 0.4716 | 0.1546 | 0.2845 |
+| Chronos-Bolt-tiny-lora16 | held-out | 22 | 0.6692 | 0.4710 | 0.1538 | 0.2770 |
+| Chronos-Bolt-tiny-lora8 | held-out | 22 | 0.6758 | 0.4772 | 0.1564 | 0.2831 |
