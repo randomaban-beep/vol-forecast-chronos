@@ -1,0 +1,9 @@
+seed: 42
+start: '2020-01-01'
+end: '2026-09-30'
+symbols: [BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, XRPUSDT, ADAUSDT, DOGEUSDT, LTCUSDT]
+held_out: [SOLUSDT, DOGEUSDT]
+horizons: [1, 5, 22]
+workers: 8
+cache: data
+results: results
