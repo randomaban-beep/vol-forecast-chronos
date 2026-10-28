@@ -113,6 +113,7 @@ def main() -> None:
     new.to_csv(results / "stage3_zero_shot.csv", index=False)
     pd.DataFrame([{"stage2_rows": len(old), "baseline_bytes": len(frozen),
                    "sha256_baseline": hashlib.sha256(frozen).hexdigest(),
+                   "sha256_baseline_lf": hashlib.sha256(frozen.replace(b"\r\n", b"\n")).hexdigest(),
                    "prefix_byte_identical": True, "recomputed_non_mcs_metrics_match": True,
                    "rows_per_chronos_model": len(template), "unique_paths_per_model": len(origins)}]).to_csv(
         results / "stage3_preservation_audit.csv", index=False)

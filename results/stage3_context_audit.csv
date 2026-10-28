@@ -1,0 +1,17 @@
+split,symbol,paths,contexts_with_missing,max_missing_days
+test,ADAUSDT,638,0,0
+test,BNBUSDT,638,0,0
+test,BTCUSDT,638,0,0
+test,DOGEUSDT,638,0,0
+test,ETHUSDT,638,0,0
+test,LTCUSDT,638,0,0
+test,SOLUSDT,638,0,0
+test,XRPUSDT,638,0,0
+validation,ADAUSDT,366,0,0
+validation,BNBUSDT,366,0,0
+validation,BTCUSDT,366,0,0
+validation,DOGEUSDT,366,0,0
+validation,ETHUSDT,366,0,0
+validation,LTCUSDT,366,0,0
+validation,SOLUSDT,366,0,0
+validation,XRPUSDT,366,0,0

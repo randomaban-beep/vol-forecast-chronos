@@ -1,6 +1,58 @@
 # Chronos-Bolt realized-volatility forecasting
 
-A reproducible forecasting-accuracy study comparing Chronos-Bolt with econometric baselines on crypto realized variance. Implementation follows AGENTS.md in six reviewed stages. **Stage 2: baseline results available; no Chronos evaluation yet.**
+<!-- stage3-results-start -->
+
+Mean test results; lower is better. QLIKE C = validation-smearing calibrated. All 95% CIs, DM tests and costs are in the [results CSV](results/stage2_baselines.csv); use the [joint MCS table](results/stage3_mcs.csv) for seven-model membership.
+
+| Group | h | Model | RMSE | MAE | QLIKE raw | QLIKE C |
+|---|---:|---|---:|---:|---:|---:|
+| fit-eligible | 1 | Chronos-Bolt-small | 0.6151 | 0.4534 | 0.1778 | 0.3156 |
+| fit-eligible | 1 | Chronos-Bolt-tiny | 0.6529 | 0.4862 | 0.2173 | 0.3835 |
+| fit-eligible | 1 | GARCH-t | 0.9176 | 0.7180 | 0.7262 | 0.6925 |
+| fit-eligible | 1 | GJR-GARCH-t | 0.9173 | 0.7173 | 0.7232 | 0.7020 |
+| fit-eligible | 1 | HAR-RV | 0.6833 | 0.4949 | 0.2773 | 0.4384 |
+| fit-eligible | 1 | HAR-log-mean-RV | 0.6871 | 0.4989 | 0.2841 | 0.4442 |
+| fit-eligible | 1 | Naive | 0.7655 | 0.5661 | 0.3692 | 0.6242 |
+| fit-eligible | 5 | Chronos-Bolt-small | 0.6315 | 0.4303 | 0.1458 | 0.2644 |
+| fit-eligible | 5 | Chronos-Bolt-tiny | 0.6365 | 0.4349 | 0.1487 | 0.2698 |
+| fit-eligible | 5 | GARCH-t | 0.8193 | 0.6627 | 0.4407 | 0.4154 |
+| fit-eligible | 5 | GJR-GARCH-t | 0.8162 | 0.6592 | 0.4349 | 0.4208 |
+| fit-eligible | 5 | HAR-RV | 0.6290 | 0.4606 | 0.1754 | 0.2629 |
+| fit-eligible | 5 | HAR-log-mean-RV | 0.6377 | 0.4676 | 0.1865 | 0.2739 |
+| fit-eligible | 5 | Naive | 0.8338 | 0.6041 | 0.3480 | 0.7023 |
+| fit-eligible | 22 | Chronos-Bolt-small | 0.7326 | 0.5108 | 0.1884 | 0.3554 |
+| fit-eligible | 22 | Chronos-Bolt-tiny | 0.7248 | 0.5086 | 0.1865 | 0.3473 |
+| fit-eligible | 22 | GARCH-t | 0.9176 | 0.7620 | 0.6150 | 0.4406 |
+| fit-eligible | 22 | GJR-GARCH-t | 0.9081 | 0.7521 | 0.5959 | 0.4524 |
+| fit-eligible | 22 | HAR-RV | 0.6865 | 0.5321 | 0.2200 | 0.3269 |
+| fit-eligible | 22 | HAR-log-mean-RV | 0.6939 | 0.5367 | 0.2277 | 0.3316 |
+| fit-eligible | 22 | Naive | 0.9834 | 0.7215 | 0.5100 | 1.0970 |
+| held-out | 1 | Chronos-Bolt-small | 0.6086 | 0.4425 | 0.1712 | 0.3098 |
+| held-out | 1 | Chronos-Bolt-tiny | 0.6393 | 0.4707 | 0.2040 | 0.3640 |
+| held-out | 1 | GARCH-t | 0.7616 | 0.5920 | 0.4101 | 0.3900 |
+| held-out | 1 | GJR-GARCH-t | 0.7617 | 0.5927 | 0.4079 | 0.3952 |
+| held-out | 1 | HAR-RV | 0.6529 | 0.4769 | 0.2270 | 0.3555 |
+| held-out | 1 | HAR-log-mean-RV | 0.6570 | 0.4802 | 0.2295 | 0.3499 |
+| held-out | 1 | Naive | 0.7326 | 0.5455 | 0.3278 | 0.5635 |
+| held-out | 5 | Chronos-Bolt-small | 0.6179 | 0.4213 | 0.1387 | 0.2626 |
+| held-out | 5 | Chronos-Bolt-tiny | 0.6235 | 0.4227 | 0.1405 | 0.2582 |
+| held-out | 5 | GARCH-t | 0.6686 | 0.5242 | 0.2432 | 0.2293 |
+| held-out | 5 | GJR-GARCH-t | 0.6675 | 0.5229 | 0.2401 | 0.2324 |
+| held-out | 5 | HAR-RV | 0.6091 | 0.4384 | 0.1494 | 0.2092 |
+| held-out | 5 | HAR-log-mean-RV | 0.6155 | 0.4375 | 0.1557 | 0.2094 |
+| held-out | 5 | Naive | 0.8067 | 0.5868 | 0.3384 | 0.6928 |
+| held-out | 22 | Chronos-Bolt-small | 0.6538 | 0.4550 | 0.1523 | 0.3132 |
+| held-out | 22 | Chronos-Bolt-tiny | 0.6519 | 0.4496 | 0.1499 | 0.2913 |
+| held-out | 22 | GARCH-t | 0.6787 | 0.5475 | 0.2686 | 0.1931 |
+| held-out | 22 | GJR-GARCH-t | 0.6746 | 0.5428 | 0.2617 | 0.1991 |
+| held-out | 22 | HAR-RV | 0.6079 | 0.4367 | 0.1470 | 0.1937 |
+| held-out | 22 | HAR-log-mean-RV | 0.6193 | 0.4404 | 0.1516 | 0.1903 |
+| held-out | 22 | Naive | 0.9462 | 0.6997 | 0.5047 | 1.1034 |
+
+<!-- stage3-results-end -->
+
+
+A reproducible forecasting-accuracy study comparing Chronos-Bolt with econometric baselines on crypto realized variance. Implementation follows AGENTS.md in six reviewed stages. **Stage 3: zero-shot Chronos-Bolt tiny and small evaluated; no fine-tuning.**
 
 ## Reproduce Stage 1
 
@@ -84,8 +136,53 @@ DM comparisons use daily cross-symbol mean QLIKE differences against **HAR-RV**,
 
 ### Baseline results and costs
 
-[Full baseline table](results/stage2_baselines.csv) contains 30 model/group/horizon rows, RMSE/MAE, raw and calibrated QLIKE, all 95% CIs, both DM tests, both MCS results and costs. [Calibration factors](results/stage2_calibration.csv), [fit audit](results/stage2_fit_audit.csv), and [cost measurements](results/stage2_costs.csv) record the frozen factors, refit parameters and timings.
+[Frozen Stage 2 baseline table](results/stage2_baselines_frozen.csv) contains 30 model/group/horizon rows, RMSE/MAE, raw and calibrated QLIKE, all 95% CIs, both DM tests, both MCS results and costs. [Calibration factors](results/stage2_calibration.csv), [fit audit](results/stage2_fit_audit.csv), and [cost measurements](results/stage2_costs.csv) record the frozen factors, refit parameters and timings.
 
-Original HAR-RV has the lowest raw QLIKE in both groups at every horizon. Smearing worsens HAR and naive QLIKE on this test period, while reducing it for the GARCH variants. The alternative HAR feature definition does not consistently improve performance. These are pooled parameter-transfer baselines, not independently fitted per-symbol benchmarks; the distinction matters for interpreting held-out results.
+Among the five Stage 2 baselines, original HAR-RV has the lowest raw QLIKE in both groups at every horizon. Smearing worsens HAR and naive QLIKE on this test period, while reducing it for the GARCH variants. The alternative HAR feature definition does not consistently improve performance. These are pooled parameter-transfer baselines, not independently fitted per-symbol benchmarks; the distinction matters for interpreting held-out results.
 
 The daily-close cache rebuild took about 192 seconds; the full five-model fit/evaluation run using those caches took about 17 seconds on this laptop. Runtime is measured, not a future Chronos runtime guarantee. Cost columns aggregate fit time over validation and test refits; inference includes state filtering and dataframe overhead, excludes fitting/calibration/metric computation, and is normalized per 1,000 scalar symbol/horizon forecasts. Parameter counts are per fitted horizon model (HAR has 4 per horizon, GARCH 4 shared across horizons, GJR 5); the additional frozen smearing factor is reported separately. GPU memory is zero because this stage runs on CPU. Timing CSV values may vary across runs; forecast and loss outputs are deterministic for the pinned environment.
+
+
+## Reproduce Stage 3
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install -e ".[test,zero-shot]"
+# On this CUDA-capable laptop, install the CUDA wheel after the dependencies:
+.venv\Scripts\python -m pip install --force-reinstall --no-deps torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python scripts/run_zero_shot.py
+```
+
+The runner uses CUDA when available, otherwise float32 CPU (omit the CUDA-wheel command on CPU-only machines). It rebuilds missing Stage 1/2 forecast caches while keeping reconstructed Stage 2 result files under ignored `data/`, then runs both pinned checkpoints. `--reuse-predictions` recomputes evaluation from cached zero-shot forecasts; a combined input/configuration fingerprint prevents reuse after changes. Timing fields describe the original measured inference, not cache retrieval. Re-running the separate Stage 2 runner rewrites its table, so rerun the Stage 3 runner afterward to restore appended Chronos rows.
+
+### Context, missing days and horizon conversion
+
+Each unique symbol/origin uses exactly 256 UTC calendar slots ending at the forecast origin, inclusive. Values are daily log RV; absent dates and dropped days stay NaN. No interpolation, forward fill or calendar compression occurs. The template is the original HAR prediction panel, with 8,032 unique paths and 23,696 scalar horizon forecasts per model across validation/test. The complete test counts remain 5,104/5,072/4,936 across all eight symbols at h=1/5/22; validation counts remain 2,928/2,896/2,760. No forecast rows are removed or added.
+
+We inspected and tested the installed `chronos-forecasting==1.5.3` implementation: it builds an observed-value mask from NaNs, excludes NaNs from per-context normalization, pairs normalized inputs with that mask, and masks fully missing patches from attention. Its internal zero placeholder for masked entries does not impute an observed zero or shift dates. [Pinned Chronos-Bolt source](https://github.com/amazon-science/chronos-forecasting/blob/v1.5.3/src/chronos/chronos_bolt.py). In this particular validation/test panel, all 8,032 contexts happen to contain no missing days; synthetic tests exercise interior NaNs and fully masked patches explicitly. [Context audit](results/stage3_context_audit.csv).
+
+Models output the **0.5 quantile of each future day's log RV**, for a 22-day path. For each requested h, `mu_h = log(mean(exp(median_log_RV_path[0:h])))`, computed with log-sum-exp for numerical stability. This is a plug-in aggregation of marginal daily medians; it is not claimed to be the predictive mean or median of the horizon aggregate. Horizon labels remain log arithmetic-mean realized RV. Extra path steps at the end of the test period are not scored when that horizon is absent from the common panel.
+
+All weights are frozen and inference runs in evaluation/inference mode with seed 42. Model revisions are pinned in `configs/stage-3-zero-shot.yaml`; no fine-tuning, hyperparameter search, or test-based model selection occurs. We report both sizes. Model pretraining corpus overlap with these assets has not been audited; strict local context cutoffs alone do not establish pretraining-data independence.
+
+### Scoring and historical preservation
+
+Both Chronos models use the unchanged shared evaluator, raw and calibrated QLIKE, HAC/Harvey DM vs original HAR-RV, 1,000-replicate date-block bootstrap CIs, and MCS. Smearing uses only 2024 residuals on the six fit-eligible symbols; factors are frozen and reused for held-out SOL/DOGE. [Chronos calibration](results/stage3_calibration.csv).
+
+[The existing results CSV](results/stage2_baselines.csv) now has 42 rows: its original 30 Stage 2 rows are retained byte-for-byte, followed by 12 Chronos rows. [Frozen historical bytes](results/stage2_baselines_frozen.csv) and [preservation audit](results/stage3_preservation_audit.csv) verify the original prefix, and the runner independently checks recomputed non-MCS baseline metrics against the original values. No historical costs or numeric formatting are rewritten. [Chronos-only results](results/stage3_zero_shot.csv) include all CIs and tests.
+
+**MCS depends on the candidate model set.** To keep every Stage 2 number intact, its historical MCS columns still describe the original five-model set. The appended Chronos MCS columns describe the seven-model set. Use [the joint Stage 3 MCS table](results/stage3_mcs.csv) for consistent seven-model comparisons for **all** models; it records the model universe explicitly. Other metrics and DM reference remain comparable across the combined table.
+
+### Device and cost measurements
+
+Both models ran on the **NVIDIA GeForce RTX 3050 6GB Laptop GPU**, CUDA PyTorch 2.6.0+cu124, float16 weights with float32 context normalization, batch size 32, context 256. Tiny has 8,652,672 frozen parameters and small 47,718,016. Trainable parameters and fitting time are zero. Small passed the predeclared warm-batch resource gate (<=4,096 MiB allocated and <=5 seconds per 32-path batch), independently of forecast quality.
+
+| Model | Inference seconds | ms / 1,000 scalar forecasts | ms / 1,000 22-day paths | Peak allocated GPU MiB | Peak reserved GPU MiB |
+|---|---:|---:|---:|---:|---:|
+| Chronos-Bolt-tiny | 9.234 | 389.675 | 1149.618 | 57.487 | 76 |
+| Chronos-Bolt-small | 11.263 | 475.316 | 1402.277 | 157.553 | 180 |
+
+[Full costs and revisions](results/stage3_costs.csv). Timing uses CUDA synchronization and includes batch transfers, model inference and median extraction, but excludes download/load, warmup, context construction and evaluation. Each path is reused for eligible h=1/5/22 rows; both scalar and full-path rates are reported. Memory includes weights and inference allocations recorded by PyTorch, not CUDA-driver overhead, other applications or total device usage. Model load times with downloaded checkpoints were about 0.65/0.84 seconds. No other GPU processes were stopped.
+
+Tiny and small improve next-day raw QLIKE over HAR in both groups; small also improves next-day calibrated QLIKE. Longer-horizon conclusions differ by metric and calibration: neither model uniformly beats HAR, and calibrated QLIKE on held-out symbols is worse at h=5 and h=22. All reported p-values are unadjusted pairwise tests; consult the joint MCS and CIs. The full suite has 54 passing tests, including exact common-panel alignment, future-context invariance, known-input path aggregation, byte preservation and the pinned library's NaN mask behavior.
