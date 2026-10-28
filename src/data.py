@@ -62,7 +62,8 @@ def split_for(date: pd.Series) -> pd.Series:
 def forecast_examples(daily: pd.DataFrame, horizon: int) -> pd.DataFrame:
     """Index labels by target END t; features stop at origin t-h.
 
-    Target is mean log RV over origin+1 through t. It is unavailable at
+    Target is log(arithmetic mean RV) over origin+1 through t (log RV for h=1).
+    It is unavailable at
     origin, and only eligible for fitting at/after t. Calendar gaps stay NaN.
     Samples spanning partition boundaries are excluded.
     """
@@ -70,8 +71,9 @@ def forecast_examples(daily: pd.DataFrame, horizon: int) -> pd.DataFrame:
         raise ValueError("Supported horizons: 1, 5, 22")
     parts = []
     for symbol, group in daily.groupby("symbol"):
-        y = group.set_index("date").y.sort_index().asfreq("D")
-        out = pd.DataFrame({"target": y.rolling(horizon).mean(),
+        calendar = group.set_index("date").sort_index().asfreq("D")
+        y = calendar.y
+        out = pd.DataFrame({"target": np.log(calendar.rv.rolling(horizon).mean()),
                             "daily": y.shift(horizon),
                             "weekly": y.rolling(5).mean().shift(horizon),
                             "monthly": y.rolling(22).mean().shift(horizon)})
