@@ -79,7 +79,7 @@ def test_leakage_features_and_targets(horizon: int) -> None:
     pd.testing.assert_frame_equal(original[original.target_end <= cutoff],
                                   altered[altered.target_end <= cutoff])
     # Stronger: features cannot see anything after forecast origin, even labels.
-    features = ["daily", "weekly", "monthly"]
+    features = ["daily", "weekly", "monthly", "weekly_rv", "monthly_rv"]
     pd.testing.assert_frame_equal(original.loc[original.origin <= cutoff, features],
                                   altered.loc[altered.origin <= cutoff, features])
     for row in original.itertuples():

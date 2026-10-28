@@ -1,0 +1,9 @@
+seed: 42
+horizons: [1, 5, 22]
+held_out: [SOLUSDT, DOGEUSDT]
+refit_days: 30
+bootstrap_reps: 1000
+block_length: 30
+garch_maxiter: 300
+cache: data
+results: results

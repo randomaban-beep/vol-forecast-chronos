@@ -16,7 +16,7 @@ import pandas as pd
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.data import COLUMNS, daily_variance, forecast_examples, split_for
+from src.data import COLUMNS, daily_variance, daily_returns, forecast_examples, split_for
 
 BASE = "https://data.binance.vision/data/spot/monthly/klines"
 LOG = logging.getLogger(__name__)
@@ -47,7 +47,9 @@ def month_data(job: tuple[str, pd.Period, Path]) -> tuple[pd.DataFrame, dict]:
     cache = root / "monthly" / f"{name}.parquet"
     meta = root / "monthly" / f"{name}-source.parquet"
     if cache.exists() and meta.exists():
-        return pd.read_parquet(cache), pd.read_parquet(meta).iloc[0].to_dict()
+        cached = pd.read_parquet(cache)
+        if "close" in cached.columns:
+            return cached, pd.read_parquet(meta).iloc[0].to_dict()
     url = f"{BASE}/{symbol}/1m/{name}.zip"
     start, end = str(month.start_time.date()), str(month.end_time.date())
     try:
@@ -108,6 +110,7 @@ def main() -> None:
     daily["split"] = split_for(daily.date)
     daily["held_out"] = daily.symbol.isin(config["held_out"])
     daily = daily.sort_values(["symbol", "date"]).reset_index(drop=True)
+    daily = daily_returns(daily)
     daily.to_parquet(root / "daily_rv.parquet", index=False)
     manifest = pd.DataFrame([item[1] for item in records])
     manifest.to_parquet(root / "manifest.parquet", index=False)
