@@ -4,6 +4,9 @@ import pandas as pd
 import pytest
 from src.ablations import WEEKDAYS, weekday_features, earliest_fraction, select_stage4_headlines
 from src.regimes import conditional_statistics, regime_thresholds
+from src.baselines import FEATURES, fit_har
+from src.data import forecast_examples
+from src.zero_shot import build_contexts
 
 
 def test_weekdays_use_known_calendar_only():
@@ -52,3 +55,28 @@ def test_conditional_bootstrap_preserves_empty_calendar_dates():
     mean, ci = conditional_statistics(sums, counts, {'seed': 42, 'block_length': 2, 'bootstrap_reps': 100})
     np.testing.assert_allclose(mean, [2., 2., 3., 1.])
     np.testing.assert_allclose(ci, [[2., 2., 3., 1.]]*2)
+
+
+@pytest.mark.parametrize('horizon', [1, 5, 22])
+def test_weekday_fit_excludes_future_targets_and_heldout(horizon):
+    dates = pd.date_range('2023-01-01', periods=400, tz='UTC')
+    rv = np.exp(np.random.default_rng(42).normal(size=len(dates)))
+    daily = pd.DataFrame(dict(date=dates, symbol='BTCUSDT', rv=rv, y=np.log(rv)))
+    rows = weekday_features(forecast_examples(pd.concat([daily, daily.assign(symbol='SOLUSDT')]), horizon))
+    cutoff = pd.Timestamp('2023-09-01', tz='UTC')
+    expected = fit_har(rows, cutoff, horizon, ['SOLUSDT'], FEATURES+WEEKDAYS)
+    rows.loc[rows.target_end.gt(cutoff) | rows.symbol.eq('SOLUSDT'), 'target'] = 1e10
+    np.testing.assert_array_equal(expected, fit_har(rows, cutoff, horizon, ['SOLUSDT'], FEATURES+WEEKDAYS))
+
+
+@pytest.mark.parametrize('length', [32, 64, 128, 256])
+def test_short_context_is_causal_trailing_slice(length):
+    dates = pd.date_range('2023-01-01', periods=400, tz='UTC')
+    daily = pd.DataFrame(dict(date=dates, symbol='BTC', y=np.arange(400, dtype=float)))
+    daily.loc[280, 'y'] = np.nan
+    rows = pd.DataFrame(dict(symbol=['BTC'], origin=[dates[300]], split=['validation']))
+    _, full = build_contexts(daily, rows)
+    _, short = build_contexts(daily, rows, length)
+    np.testing.assert_array_equal(short, full[:, -length:])
+    daily.loc[daily.date.gt(dates[300]), 'y'] = 1e10
+    np.testing.assert_array_equal(short, build_contexts(daily, rows, length)[1])
