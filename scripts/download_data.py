@@ -121,6 +121,16 @@ def main() -> None:
     counts.to_csv(results / "stage1_coverage.csv")
     daily.groupby(["symbol", "split", "reason"]).size().rename("days").to_csv(results / "stage1_drop_reasons.csv")
     examples.groupby(["symbol", "split", "horizon"]).size().rename("examples").to_csv(results / "stage1_examples.csv")
+    groups = examples.assign(symbol_group=examples.held_out.map(
+        {False: "fit-eligible", True: "held-out"}))
+    groups.groupby(["split", "horizon", "symbol_group"]).size().rename("examples").to_csv(
+        results / "stage1_example_groups.csv")
+    dropped = daily.loc[daily["split"].eq("train") & daily.y.isna(),
+                        ["symbol", "date", "reason"]].copy()
+    common = dropped.groupby("date").symbol.nunique().eq(len(config["symbols"]))
+    dropped["common_to_all_symbols"] = dropped.date.map(common)
+    dropped["date"] = dropped.date.dt.strftime("%Y-%m-%d")
+    dropped.to_csv(results / "stage1_dropped_train_dates.csv", index=False)
     print(counts.to_string())
     print(f"Stage 1 elapsed seconds: {time.perf_counter() - started:.1f}")
 
