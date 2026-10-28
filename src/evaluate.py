@@ -151,7 +151,8 @@ def evaluate_panel(predictions: pd.DataFrame, config: dict
         except ImportError:
             pass
         else:
-            for name, losses in [("calibrated", qloss), ("raw", raw_loss)]:
+            for name, losses in ([("calibrated", qloss), ("raw", raw_loss)]
+                                 if config.get("compute_mcs", True) else []):
                 mcs = MCS(losses, size=0.05, reps=config["bootstrap_reps"],
                           block_size=config["block_length"], method="R", bootstrap="circular", seed=config["seed"])
                 mcs.compute()

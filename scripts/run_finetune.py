@@ -4,6 +4,7 @@ import argparse
 import hashlib
 from pathlib import Path
 import sys
+import subprocess
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,18 @@ def main() -> None:
     cache, results = Path(config["cache"]), Path(config["results"])
     root = cache / "stage4"
     root.mkdir(parents=True, exist_ok=True)
+    if not all((cache / file).exists() for file in
+               ["daily_rv.parquet", "stage2_predictions.parquet", "stage3_predictions.parquet"]):
+        # Rebuild prerequisites without replacing historical Stage 2/3 result rows/timings.
+        rebuild_results = cache / "stage3_rebuilt_results"
+        rebuild_results.mkdir(parents=True, exist_ok=True)
+        (rebuild_results / "stage2_baselines_frozen.csv").write_bytes(
+            (results / "stage2_baselines_frozen.csv").read_bytes())
+        stage3_config = yaml.safe_load(Path("configs/stage-3-zero-shot.yaml").read_text())
+        stage3_config.update(cache=str(cache), results=str(rebuild_results))
+        config_path = cache / "stage3_rebuild.yaml"
+        config_path.write_text(yaml.safe_dump(stage3_config))
+        subprocess.run([sys.executable, "scripts/run_zero_shot.py", "--config", str(config_path)], check=True)
     daily = pd.read_parquet(cache / "daily_rv.parquet")
     baselines = pd.read_parquet(cache / "stage2_predictions.parquet")
     zero_shot = pd.read_parquet(cache / "stage3_predictions.parquet")
@@ -78,9 +91,11 @@ def main() -> None:
     costs.to_csv(results / "stage4_costs.csv", index=False)
     pd.concat(all_history, ignore_index=True).to_csv(results / "stage4_training_history.csv", index=False)
     # Score every seed independently, using the identical evaluator and calibration rule.
-    summary, calibration, scored = evaluate_panel(pd.concat([baselines, zero_shot, tuned], ignore_index=True), config)
+    summary, calibration, scored = evaluate_panel(pd.concat([baselines, zero_shot, tuned], ignore_index=True),
+                                                  {**config, "compute_mcs": False})
     scored.to_parquet(root / "scored.parquet", index=False)
-    summary.loc[summary.model.isin(tuned.model.unique())].to_csv(results / "stage4_per_seed.csv", index=False)
+    summary.loc[summary.model.isin(tuned.model.unique())].drop(
+        columns=[c for c in summary if c.startswith("mcs_")]).to_csv(results / "stage4_per_seed.csv", index=False)
     calibration.loc[calibration.model.isin(tuned.model.unique())].to_csv(results / "stage4_calibration.csv", index=False)
     from src.finetune_summary import summarize_seeds
     aggregate, mcs = summarize_seeds(scored, summary, costs, config)

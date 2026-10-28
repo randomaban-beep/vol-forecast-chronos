@@ -186,3 +186,34 @@ Both models ran on the **NVIDIA GeForce RTX 3050 6GB Laptop GPU**, CUDA PyTorch 
 [Full costs and revisions](results/stage3_costs.csv). Timing uses CUDA synchronization and includes batch transfers, model inference and median extraction, but excludes download/load, warmup, context construction and evaluation. Each path is reused for eligible h=1/5/22 rows; both scalar and full-path rates are reported. Memory includes weights and inference allocations recorded by PyTorch, not CUDA-driver overhead, other applications or total device usage. Model load times with downloaded checkpoints were about 0.65/0.84 seconds. No other GPU processes were stopped.
 
 Tiny and small improve next-day raw QLIKE over HAR in both groups; small also improves next-day calibrated QLIKE. Longer-horizon conclusions differ by metric and calibration: neither model uniformly beats HAR, and calibrated QLIKE on held-out symbols is worse at h=5 and h=22. All reported p-values are unadjusted pairwise tests; consult the joint MCS and CIs. The full suite has 54 passing tests, including exact common-panel alignment, future-context invariance, known-input path aggregation, byte preservation and the pinned library's NaN mask behavior.
+
+
+## Stage 4: full fine-tuning and LoRA
+
+Run after installing the Stage 3 CUDA environment:
+
+```powershell
+.venv\Scripts\python -m pip install -e ".[test,zero-shot,finetune]"
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python scripts/run_finetune.py --reuse-runs
+```
+
+`configs/stage-4-finetune.yaml` fixes three seeds (42, 43, 44), full fine-tuning and LoRA ranks 8/16 for tiny first and then small. The runner rebuilds missing prerequisite forecast caches into ignored result directories, preserving historical published Stage 2/3 rows and costs. Completed runs may be reused only when their full input/config fingerprint matches. Omitting `--reuse-runs` retrains all runs. Checkpoints and tensor/forecast intermediates remain under ignored `data/stage4/`; no model weights are committed.
+
+### Training and selection protocol
+
+Each training example contains 256 daily log-RV calendar slots followed by a 22-day daily log-RV target path. Context gaps remain NaN and use Chronos-Bolt's native mask. Target paths must be complete. Requiring a full 256-day calendar history creates a burn-in: the first training target starts on 2020-09-13. There are 5,890 training windows with targets ending no later than 2023-12-31, and 2,070 validation windows wholly within 2024. Only BTC, ETH, BNB, XRP, ADA and LTC enter either set. SOL/DOGE never enter weight training, checkpoint selection or smearing calibration. See the generated `stage4_data_audit.csv`.
+
+Training minimizes the model's native context-normalized multi-quantile pinball loss on the 22-day path, with unused output days masked by the library. Evaluation retains Stage 3's marginal-median path conversion: log(mean(exp(path[:h]))) for h=1/5/22. No horizon-specific fine-tuning objective or test-based hyperparameter search is introduced.
+
+Hyperparameters are fixed before scoring: AdamW, full-model learning rate 1e-5, LoRA learning rate 1e-4, weight decay 0.01, gradient clipping at 1, batch size 32, at most 3 epochs. LoRA uses PEFT 0.14.0 with attention query/value projections (`q`, `v`), alpha=2*rank, dropout=0.05 and no trained biases. Full mode trains every model parameter; LoRA freezes all original weights. Float32 master weights use CUDA bfloat16 autocast on this device (fp16 plus gradient scaling when bfloat16 is unavailable); inference uses fp16 as in Stage 3. CPU fallback uses float32. Gradient checkpointing is unnecessary when measured memory fits the laptop.
+
+At epoch 0 and after each training epoch, evaluate the six-symbol validation loss. Select the lowest loss with minimum improvement 1e-5; stop after one non-improving epoch. The unchanged pretrained checkpoint is a valid epoch-zero candidate. Selected weights are frozen before any test inference and used once over the complete common panel; no test-period refits. Validation is reused for early stopping and smearing calibration, so it is not independent generalization evidence. Training histories record checkpoint improvements, and the cost table identifies the final best epoch for each run.
+
+### Three-seed reporting
+
+Every seed is scored separately by the existing shared evaluator, using its own frozen six-symbol 2024 smearing factors. Both raw/calibrated QLIKE, log RMSE/MAE, DM versus original HAR, and block-bootstrap intervals are retained in per-seed results. Family-level headline values are the **mean of the three seed-specific metrics**, not a selected seed, an ensemble prediction, or the square root of mean seed MSE. The seed standard deviation is also reported.
+
+Family CIs resample the three seeds with replacement and resample 30-day circular time blocks, with the same sampled dates used jointly across all selected seeds and symbols, for 1,000 replications with seed 42. Each replica computes seed-specific RMSE before averaging seeds. These intervals include observed seed variation but condition on the trained models/calibration; three seeds provide limited evidence about the full training-randomness distribution.
+
+DM and the authoritative Stage 4 MCS use per-date losses averaged across seeds for each fine-tuning family. Thus the joint MCS has one candidate per size/mode, alongside the original five baselines and two zero-shot models, rather than treating seeds as 18 competing model choices. Raw/calibrated MCS are separate. MCS is omitted from per-seed diagnostics; use `stage4_mcs.csv` for family comparisons. Exact duplicate family loss paths share one MCS representative and receive identical membership, avoiding undefined tests between identical forecasts. All historical Stage 2/3 result files remain unchanged.

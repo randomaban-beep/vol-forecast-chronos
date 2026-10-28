@@ -84,3 +84,10 @@ def test_seed_summary_is_mean_metric_not_ensemble() -> None:
     np.testing.assert_allclose(std, [1, 1, 1, 1])
     assert ci.shape == (2, 4)
     np.testing.assert_array_equal(ci, seed_statistics(losses, config)[2])
+
+
+def test_identical_family_losses_share_mcs() -> None:
+    from src.finetune_summary import family_mcs
+    losses = pd.DataFrame({"zero-shot": np.arange(40.), "epoch-zero-ft": np.arange(40.)})
+    result = family_mcs(losses, {"seed": 42, "block_length": 10, "bootstrap_reps": 100})
+    assert result.eq(1.).all()

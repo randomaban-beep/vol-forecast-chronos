@@ -9,6 +9,24 @@ from src.evaluate import diebold_mariano
 LOSS_COLUMNS = ["squared_error", "absolute_error", "qlike", "qlike_raw"]
 
 
+def family_mcs(losses: pd.DataFrame, config: dict) -> pd.Series:
+    """Compute MCS on distinct loss columns; identical candidates share membership."""
+    representatives, aliases = [], {}
+    for name in losses:
+        match = next((prior for prior in representatives
+                      if np.array_equal(losses[name].to_numpy(), losses[prior].to_numpy())), None)
+        aliases[name] = name if match is None else match
+        if match is None:
+            representatives.append(name)
+    if len(representatives) == 1:
+        return pd.Series(1., index=losses.columns)
+    mcs = MCS(losses[representatives], size=.05, reps=config["bootstrap_reps"],
+              block_size=config["block_length"], method="R", bootstrap="circular", seed=config["seed"])
+    mcs.compute()
+    pvalues = mcs.pvalues.iloc[:, 0]
+    return pd.Series({name: pvalues[alias] for name, alias in aliases.items()})
+
+
 def seed_statistics(losses: np.ndarray, config: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Average seed-specific metrics, not predictions; resample seeds and date blocks.
 
@@ -51,10 +69,7 @@ def summarize_seeds(scored: pd.DataFrame, summaries: pd.DataFrame, costs: pd.Dat
             losses = date_losses[metric].unstack("family")
             if losses.isna().any().any():
                 raise ValueError("Unbalanced joint family panel")
-            mcs = MCS(losses, size=.05, reps=config["bootstrap_reps"], block_size=config["block_length"],
-                      method="R", bootstrap="circular", seed=config["seed"])
-            mcs.compute()
-            mcs_by_variant[metric] = mcs.pvalues.iloc[:, 0]
+            mcs_by_variant[metric] = family_mcs(losses, config)
             for family in losses:
                 mcs_rows.append({"symbol_group": group, "horizon": h, "model": family,
                     "metric": metric, "mcs_pvalue": mcs_by_variant[metric].loc[family],
