@@ -77,8 +77,8 @@ def adapt_model(model: object, mode: str, config: dict) -> object:
     if mode == "full":
         model.requires_grad_(True)
         return model
-    if mode not in ("lora8", "lora16"):
-        raise ValueError("Supported modes: full, lora8, lora16")
+    if mode not in ("lora4", "lora8", "lora16", "lora32"):
+        raise ValueError("Supported modes: full, lora4, lora8, lora16, lora32")
     from peft import LoraConfig, get_peft_model
     rank = int(mode.removeprefix("lora"))
     return get_peft_model(model, LoraConfig(r=rank, lora_alpha=2 * rank,
