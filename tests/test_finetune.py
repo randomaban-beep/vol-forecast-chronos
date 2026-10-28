@@ -54,7 +54,7 @@ def test_validation_only_early_stopping_includes_epoch_zero() -> None:
         stop.update(3, np.nan)
 
 
-@pytest.mark.parametrize("mode", ["full", "lora8", "lora16"])
+@pytest.mark.parametrize("mode", ["full", "lora4", "lora8", "lora16", "lora32"])
 def test_real_peft_gradient_routing(mode: str) -> None:
     torch = pytest.importorskip("torch")
     pytest.importorskip("peft")

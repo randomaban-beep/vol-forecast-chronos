@@ -5,7 +5,7 @@ import sys
 
 def main() -> None:
     """Resume training, score, and regenerate all Stage 5 analysis artifacts."""
-    for script in ['run_ablations.py', 'summarize_ablations.py', 'plot_ablations.py', 'document_stage5.py']:
+    for script in ['run_ablations.py', 'verify_stage5.py', 'summarize_ablations.py', 'plot_ablations.py', 'document_stage5.py']:
         subprocess.run([sys.executable, f'scripts/{script}'], check=True)
 
 

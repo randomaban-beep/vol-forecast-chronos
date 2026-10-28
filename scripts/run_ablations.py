@@ -16,6 +16,8 @@ def main() -> None:
     """Freeze selection, reuse identical runs, and train remaining configurations."""
     base = yaml.safe_load(Path('configs/stage-4-finetune.yaml').read_text())
     config = yaml.safe_load(Path('configs/stage-5-ablations.yaml').read_text())
+    if not 3 < config['extended_max_epochs'] <= 8:
+        raise ValueError('Extended training cap must be between 4 and 8 epochs')
     root, old, results = Path('data/stage5'), Path('data/stage4'), Path('results')
     root.mkdir(exist_ok=True)
     historical = {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -53,7 +55,8 @@ def main() -> None:
         indices = earliest_fraction(metadata, fraction)
         extended = bool(run.get('extended', False))
         spec = next(s for s in base['models'] if s['name'] == ('Chronos-Bolt-tiny' if extended else 'Chronos-Bolt-small'))
-        cfg = {**base, 'context_length': length, 'max_epochs': 8 if extended else 3}
+        cfg = {**base, 'context_length': length,
+               'max_epochs': config['extended_max_epochs'] if extended else base['max_epochs']}
         fingerprint = hashlib.sha256(yaml.safe_dump({**cfg, 'fraction': fraction}).encode() + fingerprint_data).hexdigest()
         for seed in config['seeds']:
             name = f"{run['family']}-seed{seed}"

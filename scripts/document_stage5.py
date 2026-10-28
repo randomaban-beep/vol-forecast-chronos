@@ -79,6 +79,10 @@ loss totals by sampled observation counts. Empty regime dates remain zero-padded
 for calendar-aware DM/HAC and MCS; the common count normalization preserves conditional
 mean loss differences. Regime MCS uses just these three families. Thresholds and
 sample counts are saved separately; future targets never set thresholds.
+The training-decile threshold does not force 10% of test observations into the high
+regime: these test subsets contain only 17–201 symbol/origin examples per group and
+horizon, with overlapping targets and clustered events. Conditional inference is
+therefore especially uncertain. Raw and calibrated rankings can disagree.
 
 The three worst h=1 cases are ranked by mean seed squared log error across all symbols.
 Plots show mean log forecasts and the range across seeds for illustration; headline
