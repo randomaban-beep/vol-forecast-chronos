@@ -41,15 +41,29 @@ def daily_variance(raw: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
         count = 0 if group is None else len(group)
         bad = 0 if group is None else int(group.bad.sum())
         reason = "missing_day" if count == 0 else "bad_or_duplicate_rows" if bad else "missing_minutes" if count != 1440 else "ok"
-        rv = np.nan
+        rv, close = np.nan, np.nan
         if reason == "ok":
             group = group.sort_values("time")
             endpoints = np.r_[group.open.iloc[0], group.close.iloc[4::5].to_numpy()]
             rv = float(np.square(np.diff(np.log(endpoints))).sum())
             if not np.isfinite(rv) or rv <= 0:
                 reason, rv = "nonpositive_rv", np.nan
-        rows.append((day, rv, np.log(rv) if rv > 0 else np.nan, reason, count, bad))
-    return pd.DataFrame(rows, columns=["date", "rv", "y", "reason", "minute_rows", "bad_rows"])
+            else:
+                close = float(group.close.iloc[-1])
+        rows.append((day, rv, np.log(rv) if rv > 0 else np.nan, reason, count, bad, close))
+    return pd.DataFrame(rows, columns=["date", "rv", "y", "reason", "minute_rows", "bad_rows", "close"])
+
+
+def daily_returns(daily: pd.DataFrame) -> pd.DataFrame:
+    """Derive decimal close-to-close log returns only across consecutive valid days."""
+    parts = []
+    for _, group in daily.groupby("symbol", sort=True):
+        group = group.sort_values("date").copy()
+        close = group.close.where(group.reason.eq("ok"))
+        consecutive = group.date.diff().eq(pd.Timedelta(days=1))
+        group["return"] = np.log(close / close.shift()).where(consecutive)
+        parts.append(group)
+    return pd.concat(parts, ignore_index=True)
 
 
 def split_for(date: pd.Series) -> pd.Series:
@@ -76,7 +90,9 @@ def forecast_examples(daily: pd.DataFrame, horizon: int) -> pd.DataFrame:
         out = pd.DataFrame({"target": np.log(calendar.rv.rolling(horizon).mean()),
                             "daily": y.shift(horizon),
                             "weekly": y.rolling(5).mean().shift(horizon),
-                            "monthly": y.rolling(22).mean().shift(horizon)})
+                            "monthly": y.rolling(22).mean().shift(horizon),
+                            "weekly_rv": np.log(calendar.rv.rolling(5).mean()).shift(horizon),
+                            "monthly_rv": np.log(calendar.rv.rolling(22).mean()).shift(horizon)})
         out.index.name = "target_end"
         out = out.reset_index()
         out["origin"] = out.target_end - pd.Timedelta(days=horizon)
