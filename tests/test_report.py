@@ -4,7 +4,8 @@ import re
 import hashlib
 import numpy as np
 import pandas as pd
-from src.report import headline_table, legacy_headline_table, headline_rows
+from src.report import (headline_table, stage7_ex_shock_table, stage7_paired_diff_table,
+                        stage7_shock_loss_share_table, legacy_headline_table, headline_rows)
 from scripts.package_results import excluded_windows
 
 
@@ -82,3 +83,26 @@ def test_extended_metrics_sanity():
     assert (df.mdape_pct > 0).all()
     assert (df.r2_mz_pct >= 0).all() and (df.r2_mz_pct <= 100).all()
     assert (df.pinball_90 > 0).all()
+
+
+def test_stage7_ex_shock_tables_in_readme():
+    readme = Path('README.md').read_text(encoding='utf-8')
+    assert stage7_ex_shock_table() in readme
+    assert stage7_paired_diff_table() in readme
+    assert stage7_shock_loss_share_table() in readme
+
+
+def test_stage7_ex_shock_data_sanity():
+    ex = pd.read_csv('results/stage7_ex_shock.csv')
+    assert len(ex) == 36
+    assert (ex.rmse_ex > 0).all()
+    assert (ex.qlike_ex > 0).all()
+
+    paired = pd.read_csv('results/stage7_paired_diff.csv')
+    assert len(paired) == 12
+    assert set(paired['sample'].unique()) == {'full-sample', 'ex-shock'}
+
+    shares = pd.read_csv('results/stage7_shock_loss_share.csv')
+    assert len(shares) == 36
+    assert (shares.shock_share_qlike_pct > 0).all() and (shares.shock_share_qlike_pct < 100).all()
+

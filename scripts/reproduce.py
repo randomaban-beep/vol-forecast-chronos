@@ -32,6 +32,7 @@ def main() -> None:
         return
     if args.rescore:
         subprocess.run([sys.executable, 'scripts/rescore_stage7.py'], check=True, cwd=project)
+        subprocess.run([sys.executable, 'scripts/compute_stage7_ex_shock.py'], check=True, cwd=project)
     start = time.perf_counter()
     for script in ['make_readme_figures.py', 'write_readme.py']:
         subprocess.run([sys.executable, f'scripts/{script}'], check=True, cwd=project)

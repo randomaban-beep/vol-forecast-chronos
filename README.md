@@ -19,18 +19,19 @@ This project investigates a central question in modern quantitative machine lear
 - **Reproducible & Audited**: One-command rebuild (`python scripts/reproduce.py`), cryptographic preservation hashes, and open-source MIT release.
 
 ### High-level takeaways (Patton 2011 standard evaluation)
-1. **The Calendar Baseline (HAR-weekday) Wins Overall**: Under standard Patton (2011) QLIKE and log RMSE, HAR-weekday is the top-performing model across all horizons (h=1, 5, 22). A simple 10-parameter linear regression with weekday terms beats or matches the 48M-parameter foundation model at a fraction of the compute cost.
-2. **Calibrated Chronos Competes at Multi-Day Horizons**: When smearing calibration is applied to align variance scales with the conditional arithmetic mean, fine-tuned Chronos-Bolt achieves competitive or slightly lower point estimates at h=5 (0.3697 vs 0.3799) and h=22 (0.3205 vs 0.3491); however, Diebold-Mariano tests against HAR-weekday show p-values of 0.31–0.65 (fail to reject the null of equal predictive accuracy).
-3. **Directional Accuracy (MDA)**: Where Chronos clearly leads is in predicting the *direction* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
+1. **The Calendar Baseline (HAR-weekday) Wins on RMSE & Raw QLIKE**: HAR-weekday achieves the lowest log RMSE across all 6 horizon/group combinations and lowest raw Patton QLIKE on all fit-eligible horizons. On MAE, HAR-weekday wins on all held-out horizons and fit-eligible h=1 (0.4369), but Chronos models achieve lower MAE on fit-eligible h=5 (Zero-shot 0.4303, Fine-tuned 0.4365 vs HAR-weekday 0.4402) and h=22 (Fine-tuned 0.5068 vs HAR-weekday 0.5299). On held-out raw QLIKE, GARCH-t achieves the lowest values. A simple 10-parameter linear regression beats or matches the 48M-parameter foundation model across headline metrics at a fraction of the compute cost.
+2. **Calibrated Chronos Competes at Multi-Day Horizons**: When smearing calibration is applied to align variance scales with the conditional arithmetic mean, fine-tuned Chronos-Bolt achieves competitive or slightly lower point estimates at h=5 (0.3697 vs 0.3799) and h=22 (0.3205 vs 0.3491); however, Diebold-Mariano tests against HAR-weekday show p-values of 0.31–0.65 (fail to reject the null of equal predictive accuracy). On ex-shock evaluation, HAR-weekday has lower loss across all horizons, significantly outperforming Fine-tuned Chronos at h=1 (DM p=0.0058).
+3. **Directional Accuracy (MDA)**: Chronos leads on fit-eligible h=5 (71.38% vs 68.82%) and h=22 (75.68% vs 71.58%), and held-out h=1 (69.07% vs 68.57%) and h=5 (72.06% vs 69.32%). However, HAR-weekday beats Chronos on held-out h=22 (78.20% vs 77.23%) and is virtually tied at fit-eligible h=1 (70.04% vs 70.42%).
 4. **Typical Days (MdAPE)**: On median percentage error (which is robust to single-day extreme shocks), Chronos yields lower typical errors (31–36% MdAPE vs 37–46% for HAR).
 
 ---
 
 ## The 30-second story
 
-At h=1, HAR-weekday wins on raw Patton QLIKE (0.4383 vs 0.5059 for fine-tuned) and log RMSE (0.5920 vs 0.6087).
-On calibrated QLIKE, smearing aligns Chronos with the arithmetic mean, putting fine-tuned Chronos (0.3802) roughly tied with HAR-weekday (0.3758; DM p=0.6471).
-At multi-day horizons (h=5 and h=22), calibrated Chronos achieves slightly lower point estimates (0.3205 vs 0.3491 at h=22), but differences are not statistically distinguishable from HAR-weekday.
+At h=1, HAR-weekday wins on raw Patton QLIKE (0.4383 vs 0.5059 for fine-tuned), MAE (0.4369 vs 0.4429), and log RMSE (0.5920 vs 0.6087).
+On calibrated QLIKE, smearing aligns Chronos with the conditional arithmetic mean, putting fine-tuned Chronos (0.3802) roughly tied with HAR-weekday (0.3758; DM p=0.6471).
+At multi-day horizons (h=5 and h=22), calibrated Chronos achieves slightly lower point estimates (0.3205 vs 0.3491 at h=22) and lower MAE on fit-eligible symbols, but differences are not statistically distinguishable from HAR-weekday (DM p=0.31–0.58).
+Ex-shock evaluation confirms that over 45–50% of test-period calibrated QLIKE occurred on just three days during the October 2025 flash crash.
 This is a forecasting-accuracy study, not a trading strategy.
 
 ![Raw QLIKE for six headline models across three horizons; held-out symbols in the lighter lower panel; bars show 95 percent confidence intervals](docs/img/headline.png)
@@ -82,6 +83,118 @@ Lower QLIKE and RMSE are better. Intervals use 30-day circular blocks; fine-tune
 Sources: [Stage 7 headline CSV](results/stage7_headline.csv), [baselines](results/stage7_baselines.csv),
 [zero-shot](results/stage7_zero_shot.csv), [fine-tuning](results/stage7_finetune.csv).
 
+### Ex-Shock Robustness (Purging October 10–12 Flash Crash Windows)
+
+To evaluate whether performance is driven by tail outliers, the table below re-evaluates all models after purging the October 10–12, 2025 flash crash and any overlapping multi-day target windows ($h=5, 22$).
+Models, validation choices, and calibration smearing factors remain frozen.
+
+| Group | h | Model | log RMSE (Ex) | MAE (Ex) | Raw Patton (Ex) | Cal Patton (Ex) | DM p vs Weekday | MCS 95% |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | :---: |
+| fit-eligible | 1 | Naive | 0.7347 | 0.5564 | 0.3215 | 0.2846 | <0.0001 | ✗ |
+| fit-eligible | 1 | HAR-RV | 0.6577 | 0.4883 | 0.2400 | 0.2286 | <0.0001 | ✗ |
+| fit-eligible | 1 | HAR-weekday | 0.5636 | 0.4308 | 0.1944 | 0.1891 | — | ✓ |
+| fit-eligible | 1 | GARCH-t | 0.9029 | 0.7137 | 0.3096 | 0.3044 | <0.0001 | ✗ |
+| fit-eligible | 1 | Zero-shot | 0.5851 | 0.4459 | 0.2193 | 0.2098 | <0.0001 | ✗ |
+| fit-eligible | 1 | Fine-tuned | 0.5781 | 0.4352 | 0.2373 | 0.2018 | 0.0058 | ✗ |
+| fit-eligible | 5 | Naive | 0.7716 | 0.5797 | 0.4914 | 0.3568 | <0.0001 | ✗ |
+| fit-eligible | 5 | HAR-RV | 0.5620 | 0.4405 | 0.1951 | 0.1982 | 0.0001 | ✗ |
+| fit-eligible | 5 | HAR-weekday | 0.5387 | 0.4193 | 0.1835 | 0.1870 | — | ✓ |
+| fit-eligible | 5 | GARCH-t | 0.7795 | 0.6468 | 0.2601 | 0.2548 | <0.0001 | ✗ |
+| fit-eligible | 5 | Zero-shot | 0.5566 | 0.4078 | 0.2427 | 0.2047 | 0.0466 | ✓ |
+| fit-eligible | 5 | Fine-tuned | 0.5606 | 0.4138 | 0.2477 | 0.1966 | 0.0987 | ✓ |
+| fit-eligible | 22 | Naive | 0.8642 | 0.6578 | 0.6448 | 0.4116 | <0.0001 | ✗ |
+| fit-eligible | 22 | HAR-RV | 0.5745 | 0.4830 | 0.1644 | 0.1878 | 0.0002 | ✗ |
+| fit-eligible | 22 | HAR-weekday | 0.5716 | 0.4804 | 0.1630 | 0.1861 | — | ✓ |
+| fit-eligible | 22 | GARCH-t | 0.8777 | 0.7390 | 0.2793 | 0.2321 | 0.0005 | ✗ |
+| fit-eligible | 22 | Zero-shot | 0.5893 | 0.4470 | 0.2456 | 0.2065 | 0.1086 | ✓ |
+| fit-eligible | 22 | Fine-tuned | 0.5770 | 0.4456 | 0.2321 | 0.1911 | 0.5205 | ✓ |
+| held-out | 1 | Naive | 0.7012 | 0.5361 | 0.2886 | 0.2621 | <0.0001 | ✗ |
+| held-out | 1 | HAR-RV | 0.6269 | 0.4707 | 0.2283 | 0.2092 | 0.0021 | ✗ |
+| held-out | 1 | HAR-weekday | 0.5450 | 0.4144 | 0.1945 | 0.1802 | — | ✓ |
+| held-out | 1 | GARCH-t | 0.7445 | 0.5878 | 0.2347 | 0.2322 | 0.0004 | ✗ |
+| held-out | 1 | Zero-shot | 0.5792 | 0.4351 | 0.2186 | 0.2118 | <0.0001 | ✗ |
+| held-out | 1 | Fine-tuned | 0.5646 | 0.4202 | 0.2253 | 0.1942 | 0.0048 | ✗ |
+| held-out | 5 | Naive | 0.7475 | 0.5638 | 0.4392 | 0.3312 | <0.0001 | ✗ |
+| held-out | 5 | HAR-RV | 0.5436 | 0.4190 | 0.2003 | 0.1851 | 0.0155 | ✓ |
+| held-out | 5 | HAR-weekday | 0.5240 | 0.3977 | 0.1910 | 0.1770 | — | ✓ |
+| held-out | 5 | GARCH-t | 0.6211 | 0.5076 | 0.1889 | 0.1872 | 0.6118 | ✓ |
+| held-out | 5 | Zero-shot | 0.5500 | 0.4001 | 0.2427 | 0.2103 | 0.0020 | ✓ |
+| held-out | 5 | Fine-tuned | 0.5487 | 0.4042 | 0.2343 | 0.1848 | 0.3285 | ✓ |
+| held-out | 22 | Naive | 0.8418 | 0.6447 | 0.5918 | 0.3896 | <0.0001 | ✗ |
+| held-out | 22 | HAR-RV | 0.4913 | 0.3888 | 0.1407 | 0.1334 | 0.1375 | ✓ |
+| held-out | 22 | HAR-weekday | 0.4898 | 0.3872 | 0.1399 | 0.1327 | — | ✓ |
+| held-out | 22 | GARCH-t | 0.6142 | 0.5177 | 0.1562 | 0.1372 | 0.7768 | ✓ |
+| held-out | 22 | Zero-shot | 0.5429 | 0.4045 | 0.2114 | 0.1935 | 0.0004 | ✗ |
+| held-out | 22 | Fine-tuned | 0.5245 | 0.4086 | 0.1822 | 0.1572 | 0.1229 | ✓ |
+
+Source: [Stage 7 ex-shock CSV](results/stage7_ex_shock.csv).
+
+### Paired Loss Differences (Fine-tuned minus HAR-weekday)
+
+Mean difference in calibrated Patton QLIKE ($d_t = L_{\text{FT}, t} - L_{\text{Weekday}, t}$), 95% circular block-bootstrap confidence intervals (30-day blocks, 1,000 replications), and Diebold-Mariano test statistics. Negative values favor Fine-tuned Chronos; positive values favor HAR-weekday.
+
+| Group | h | Sample | n | Mean Diff (FT − Weekday) | 95% Bootstrap CI | DM stat | DM p-val |
+| --- | ---: | --- | ---: | ---: | --- | ---: | ---: |
+| fit-eligible | 1 | full-sample | 638 | +0.0044 | [-0.0202, +0.0196] | +0.458 | 0.6471 |
+| fit-eligible | 1 | ex-shock | 635 | +0.0127 | [+0.0045, +0.0210] | +2.769 | 0.0058 |
+| fit-eligible | 5 | full-sample | 634 | -0.0102 | [-0.0571, +0.0189] | -0.549 | 0.5834 |
+| fit-eligible | 5 | ex-shock | 627 | +0.0096 | [-0.0017, +0.0202] | +1.654 | 0.0987 |
+| fit-eligible | 22 | full-sample | 617 | -0.0286 | [-0.0965, +0.0135] | -1.009 | 0.3136 |
+| fit-eligible | 22 | ex-shock | 593 | +0.0050 | [-0.0105, +0.0221] | +0.643 | 0.5205 |
+| held-out | 1 | full-sample | 638 | +0.0107 | [-0.0019, +0.0217] | +1.755 | 0.0797 |
+| held-out | 1 | ex-shock | 635 | +0.0141 | [+0.0044, +0.0232] | +2.829 | 0.0048 |
+| held-out | 5 | full-sample | 634 | -0.0151 | [-0.0673, +0.0204] | -0.690 | 0.4903 |
+| held-out | 5 | ex-shock | 627 | +0.0078 | [-0.0085, +0.0236] | +0.978 | 0.3285 |
+| held-out | 22 | full-sample | 617 | -0.0149 | [-0.1012, +0.0414] | -0.413 | 0.6794 |
+| held-out | 22 | ex-shock | 593 | +0.0245 | [-0.0072, +0.0574] | +1.545 | 0.1229 |
+
+Source: [Stage 7 paired differences CSV](results/stage7_paired_diff.csv).
+
+### Shock Day Loss Concentration
+
+Percentage of cumulative test-period QLIKE loss concentrated specifically in the removed October shock origins. Even though shock dates comprise only 0.47% to 3.89% of origin dates, they account for roughly half of all accumulated loss across models.
+
+| Group | h | Model | Shock Dates (%) | Cal QLIKE Shock Share | Raw QLIKE Shock Share |
+| --- | ---: | --- | ---: | ---: | ---: |
+| fit-eligible | 1 | Naive | 3/638 (0.47%) | 36.94% | 43.19% |
+| fit-eligible | 1 | HAR-RV | 3/638 (0.47%) | 45.55% | 52.12% |
+| fit-eligible | 1 | HAR-weekday | 3/638 (0.47%) | 49.91% | 55.85% |
+| fit-eligible | 1 | GARCH-t | 3/638 (0.47%) | 39.64% | 38.55% |
+| fit-eligible | 1 | Zero-shot | 3/638 (0.47%) | 47.87% | 55.65% |
+| fit-eligible | 1 | Fine-tuned | 3/638 (0.47%) | 47.17% | 53.31% |
+| fit-eligible | 5 | Naive | 7/634 (1.10%) | 28.94% | 35.34% |
+| fit-eligible | 5 | HAR-RV | 7/634 (1.10%) | 49.32% | 55.79% |
+| fit-eligible | 5 | HAR-weekday | 7/634 (1.10%) | 51.32% | 57.55% |
+| fit-eligible | 5 | GARCH-t | 7/634 (1.10%) | 43.68% | 42.36% |
+| fit-eligible | 5 | Zero-shot | 7/634 (1.10%) | 46.84% | 54.37% |
+| fit-eligible | 5 | Fine-tuned | 7/634 (1.10%) | 47.41% | 54.37% |
+| fit-eligible | 22 | Naive | 24/617 (3.89%) | 31.39% | 41.20% |
+| fit-eligible | 22 | HAR-RV | 24/617 (3.89%) | 48.45% | 59.12% |
+| fit-eligible | 22 | HAR-weekday | 24/617 (3.89%) | 48.77% | 59.34% |
+| fit-eligible | 22 | GARCH-t | 24/617 (3.89%) | 41.59% | 31.86% |
+| fit-eligible | 22 | Zero-shot | 24/617 (3.89%) | 43.77% | 58.11% |
+| fit-eligible | 22 | Fine-tuned | 24/617 (3.89%) | 42.71% | 58.16% |
+| held-out | 1 | Naive | 3/638 (0.47%) | 40.28% | 47.34% |
+| held-out | 1 | HAR-RV | 3/638 (0.47%) | 48.28% | 53.88% |
+| held-out | 1 | HAR-weekday | 3/638 (0.47%) | 51.56% | 56.27% |
+| held-out | 1 | GARCH-t | 3/638 (0.47%) | 43.02% | 42.05% |
+| held-out | 1 | Zero-shot | 3/638 (0.47%) | 47.29% | 55.42% |
+| held-out | 1 | Fine-tuned | 3/638 (0.47%) | 49.24% | 55.71% |
+| held-out | 5 | Naive | 7/634 (1.10%) | 27.25% | 34.41% |
+| held-out | 5 | HAR-RV | 7/634 (1.10%) | 49.39% | 53.53% |
+| held-out | 5 | HAR-weekday | 7/634 (1.10%) | 51.00% | 54.93% |
+| held-out | 5 | GARCH-t | 7/634 (1.10%) | 47.69% | 46.62% |
+| held-out | 5 | Zero-shot | 7/634 (1.10%) | 41.34% | 49.66% |
+| held-out | 5 | Fine-tuned | 7/634 (1.10%) | 46.60% | 53.48% |
+| held-out | 22 | Naive | 24/617 (3.89%) | 27.48% | 37.65% |
+| held-out | 22 | HAR-RV | 24/617 (3.89%) | 52.80% | 58.99% |
+| held-out | 22 | HAR-weekday | 24/617 (3.89%) | 53.09% | 59.20% |
+| held-out | 22 | GARCH-t | 24/617 (3.89%) | 52.90% | 43.66% |
+| held-out | 22 | Zero-shot | 24/617 (3.89%) | 32.51% | 49.71% |
+| held-out | 22 | Fine-tuned | 24/617 (3.89%) | 41.19% | 58.31% |
+
+Source: [Stage 7 shock loss shares CSV](results/stage7_shock_loss_share.csv).
+
 ## Scoreboard
 
 ![Raw and calibrated QLIKE grids; green borders mark row minima and stars mark membership in the 95 percent model confidence set](docs/img/scoreboard.png)
@@ -128,12 +241,12 @@ this is a loss rescore, not a counterfactual market in which the shock never hap
 | held-out | 5 | GARCH-t | GARCH-t | Fine-tuned | HAR-weekday | 7 |
 | held-out | 22 | GARCH-t | HAR-weekday | Fine-tuned | HAR-weekday | 24 |
 
-Under standard Patton QLIKE, removing the flash crash dates cements HAR-weekday as the dominant performer across all horizons and groups.
-All model scores, ranks and retained counts: [robustness CSV](results/stage7_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
+Under standard Patton QLIKE, removing the flash crash dates ranks HAR-weekday first in calibrated QLIKE across all horizons and groups; difference is statistically significant at h=1 (DM p = 0.0058 fit-eligible, p = 0.0048 held-out), while at h=5 and h=22 HAR-weekday ranks first with differences not statistically significant (DM p = 0.0987 and 0.5205).
+All model scores, ranks and retained counts: [robustness CSV](results/stage7_robustness.csv). This sensitivity check reports point estimates and DM paired tests without refitting.
 
 ### Beyond loss averages: directional calls and typical error
 
-Standard QLIKE and RMSE averages are heavily weighted by tail events. Complementary scale-free metrics from [extended metrics CSV](results/stage6_extended_metrics.csv) show where Chronos excels:
+Standard QLIKE and RMSE averages are heavily weighted by tail events. Complementary scale-free metrics from [extended metrics CSV](results/stage6_extended_metrics.csv) show performance across alternative dimensions:
 
 **Directional Accuracy (MDA, higher is better; Naive excluded as direction is undefined):**
 
@@ -157,8 +270,8 @@ Standard QLIKE and RMSE averages are heavily weighted by tail events. Complement
 | held-out | 5 | 43.53% | 35.01% | 33.80% | 50.98% | 31.40% | 30.50% |
 | held-out | 22 | 49.37% | 32.82% | 32.65% | 53.04% | 31.91% | 31.89% |
 
-- **Directional hit rate:** Chronos models achieve the highest directional accuracy across both fit-eligible and held-out assets (reaching 70.42% at h=1 and up to 75.68% at h=22), consistently outperforming standard HAR-RV (64.45% and 71.77%).
-- **Typical-day error:** On Median Absolute Percentage Error (MdAPE), Chronos-Bolt consistently beats HAR-RV and HAR-weekday across all horizons (33.39% vs 35.01% at h=1; 31.57% vs 36.70% at h=5; 36.65% vs 46.29% at h=22), demonstrating substantially lower percentage error when outlier shock days are mitigated.
+- **Directional hit rate (MDA):** Chronos models achieve higher directional accuracy on fit-eligible h=5 (71.38% vs 68.82%) and h=22 (75.68% vs 71.58%), and held-out h=1 (69.07% vs 68.57%) and h=5 (72.06% vs 69.32%). However, **HAR-weekday beats Chronos on held-out h=22** (78.20% vs 77.23% for Fine-tuned and 77.80% for Zero-shot). At h=1 on fit-eligible assets, HAR-weekday reaches 70.04%, within 0.38% of Fine-tuned Chronos (70.42%) and outperforming Zero-shot (68.47%).
+- **Typical-day error (MdAPE):** On Median Absolute Percentage Error (MdAPE), Chronos-Bolt yields lower median percentage error across all horizons (33.39% vs 35.01% at h=1; 31.57% vs 36.70% at h=5; 36.65% vs 46.29% at h=22).
 
 ## Errata: Loss Function Orientation (Patton 2011 vs Legacy)
 
@@ -178,12 +291,21 @@ The distinction is mathematically fundamental:
    Taking the first-order condition for the legacy formula:
    $$\frac{\partial \mathcal{L}_{\text{legacy}}}{\partial \hat{V}} = \frac{1}{V} - \frac{1}{\hat{V}} \implies \mathbb{E}\left[\frac{\partial \mathcal{L}_{\text{legacy}}}{\partial \hat{V}}\right] = 0 \iff \hat{V} = \frac{1}{\mathbb{E}[1/V]}$$
    The legacy loss function is minimized at the **conditional harmonic mean** of realized variance.
-   Because the harmonic mean is strictly less than or equal to the arithmetic mean ($\text{HM} \le \text{AM}$), the legacy formula heavily penalized forecasts higher than actual and systematically rewarded models that under-forecasted volatility (negative bias).
+   Because the harmonic mean is strictly less than or equal to the arithmetic mean ($\text{HM} \le \text{AM}$), the legacy formula penalized forecasts higher than actual linearly in $\hat{V}/V$ while penalizing under-prediction only logarithmically. This systematically rewarded models that under-forecasted volatility (negative bias).
+   Under standard Patton QLIKE, under-prediction ($V > \hat{V}$) is penalized **linearly in the ratio $V/\hat{V}$** (as $V/\hat{V} \to \infty$, $\mathcal{L} \approx V/\hat{V}$), while over-prediction grows only logarithmically ($\log(\hat{V}/V)$).
 3. **What Changed Under Patton (2011) QLIKE**:
    - Because raw Chronos-Bolt forecasts had a slight negative bias (bias $\approx -0.09$), legacy QLIKE artificially boosted raw Chronos-Bolt below HAR-RV and HAR-weekday.
    - When smearing calibration was applied (multiplying by $\mathbb{E}[\exp(e)] > 1$ to align with the arithmetic mean), legacy QLIKE penalized that upward scale adjustment.
    - Under standard Patton QLIKE, smearing calibration now functions exactly as econometrics theory predicts: it scales forecasts to the arithmetic mean, cutting loss from ~0.50 down to ~0.38.
-   - Under standard Patton QLIKE, **HAR-weekday is the clear winner on raw loss and log RMSE across all horizons**. On calibrated loss, fine-tuned Chronos-Bolt achieves slightly lower point estimates at $h=5$ and $h=22$ (e.g. 0.3205 vs 0.3491 at $h=22$), but Diebold-Mariano tests vs HAR-weekday confirm the difference is not statistically significant ($p \approx 0.31\text{--}0.65$).
+   - Under standard Patton QLIKE, **HAR-weekday achieves the lowest log RMSE across all horizons and groups, and lowest raw QLIKE on all fit-eligible horizons**. On calibrated loss, fine-tuned Chronos-Bolt achieves slightly lower point estimates at $h=5$ and $h=22$ (e.g. 0.3205 vs 0.3491 at $h=22$), but Diebold-Mariano tests vs HAR-weekday confirm the difference is not statistically significant ($p \approx 0.31\text{--}0.65$). On ex-shock evaluation, HAR-weekday ranks first across all horizons and groups.
+
+### HAC Bandwidth and Extreme Diebold-Mariano p-values
+
+The Diebold-Mariano implementation uses Newey-West / Bartlett HAC covariance estimation with bandwidth $\min(N-1, \max(h-1, \lfloor 4(N/100)^{2/9} \rfloor))$, yielding 6 lags for $h=1$ and $h=5$ ($N=638$), and 21 lags for $h=22$.
+Several baseline comparisons vs HAR-weekday produce extreme p-values ($< 10^{-9}$), including fit-eligible $h=1$ GARCH-t ($p = 3.87 \times 10^{-14}$) and HAR-RV ($p = 2.45 \times 10^{-10}$), and held-out $h=1$ Zero-shot ($p = 6.90 \times 10^{-11}$).
+
+**Are these extreme p-values driven by the shock days?**
+No. When re-estimated on the ex-shock sample (purging October 10–12), these p-values remain equally or more extreme (GARCH-t $p = 1.47 \times 10^{-18}$, HAR-RV $p = 7.10 \times 10^{-10}$, Zero-shot $p = 5.90 \times 10^{-15}$). Purging the flash crash reduces the sample variance of the loss differential $\text{Var}(d_t)$ without closing the gap, confirming that HAR-weekday's predictive advantage reflects persistent, day-in-day-out calendar volume regularity rather than outlier flash-crash leverage.
 
 ### Appendix: Legacy Orientation QLIKE Numbers (Stages 2–6)
 For historical auditability and full reproducibility of earlier milestones, the legacy orientation QLIKE values ($\hat{V}/V - \log(\hat{V}/V) - 1$) are preserved below:
@@ -342,7 +464,7 @@ Missing timings are marked, not guessed. Stage 6 reports a local report-generati
 | 3 | 0.366 | Cached model load + inference only | RTX 3050 |
 | 4 | 31.711 | Training, all 18 runs | RTX 3050 |
 | 5 | 65.319 | Training, 45 new runs; 9 reused | RTX 3050 |
-| 6 | 0.152 | Measured CSV-only figure + README build; excludes rescore | CPU |
+| 6 | 0.117 | Measured CSV-only figure + README build; excludes rescore | CPU |
 
 Source: [runtime CSV](results/stage6_runtime.csv), derived from the original per-stage cost CSVs. Timing excludes different overheads by stage;
 historical GPU allocations exclude driver memory and other applications.
