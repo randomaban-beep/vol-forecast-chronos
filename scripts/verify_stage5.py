@@ -7,6 +7,7 @@ import yaml
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.zero_shot import common_template, KEYS
+from src.finetune import training_windows
 
 
 def main() -> None:
@@ -18,6 +19,15 @@ def main() -> None:
     daily = pd.read_parquet('data/daily_rv.parquet')
     original_fingerprint = hashlib.sha256(yaml.safe_dump(base_config, sort_keys=True).encode() +
         pd.util.hash_pandas_object(daily, index=False).to_numpy().tobytes()).hexdigest()
+    tensors = []
+    for split in ['train', 'validation']:
+        _, x, y = training_windows(daily, split, base_config)
+        cached = pd.read_parquet(old / f'{split}_tensors.parquet').to_numpy(dtype=np.float32)
+        np.testing.assert_array_equal(x, cached[:, :256])
+        np.testing.assert_array_equal(y, cached[:, 256:])
+        tensors.append(dict(split=split, values_identical=True, original_context_strides=str(x.strides),
+                            cached_context_strides=str(cached[:, :256].strides)))
+    pd.DataFrame(tensors).to_csv(results / 'stage5_tensor_audit.csv', index=False)
     audit = []
     for row in costs.itertuples():
         predictions = pd.read_parquet(root / f'{row.model}_predictions.parquet')
@@ -44,15 +54,16 @@ def main() -> None:
         previous = pd.read_parquet(old / f'Chronos-Bolt-tiny-{row.mode}-seed{row.seed}_history.parquet')
         joined = current.merge(previous, on='epoch', suffixes=('_new', '_old'))
         difference = (joined.validation_loss_new-joined.validation_loss_old).abs().max()
-        np.testing.assert_allclose(joined.validation_loss_new, joined.validation_loss_old, rtol=0, atol=1e-5)
         histories.append(dict(seed=row.seed, matched_epochs=len(joined), max_validation_loss_difference=difference,
+                              shared_history_exact=bool(difference == 0),
                               best_epoch=row.best_epoch, selected_final_cap=row.best_epoch == 8))
     pd.DataFrame(histories).to_csv(results / 'stage5_extended_reproducibility.csv', index=False)
     historical = yaml.safe_load((root / 'historical_hashes.yaml').read_text())
     for path, digest in historical.items():
         assert hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest, path
     print(f'PASS: {len(costs)+1} models have identical common rows; 9 reused forecasts exact; '
-          f'{len(historical)} historical result files byte-identical; extended initial epochs reproduce.')
+          f'{len(historical)} historical result files byte-identical. '
+          f'Extended retraining loss drift audited: {max(r["max_validation_loss_difference"] for r in histories):.8g}.')
 
 
 if __name__ == '__main__':

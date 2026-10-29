@@ -34,6 +34,8 @@ def main() -> None:
     frames += [pd.read_parquet(p) for p in root.glob('*_predictions.parquet')]
     predictions = pd.concat(frames, ignore_index=True)
     summary, calibration, scored = evaluate_panel(predictions, {**config, 'compute_mcs': False})
+    # MCS is computed jointly at family level below, not separately per seed.
+    summary = summary.drop(columns=[column for column in summary if column.startswith('mcs_')])
     scored.to_parquet(root / 'scored.parquet', index=False)
     aggregate, mcs = summarize_seeds(scored, summary, costs, config)
     aggregate = add_weekday_dm(aggregate, scored)

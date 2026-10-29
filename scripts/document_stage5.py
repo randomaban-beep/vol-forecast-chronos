@@ -37,6 +37,12 @@ expanding fit, 30-day refit dates, targets and common forecast panel are retaine
     text += markdown(weekday, ['symbol_group', 'horizon', 'rmse', 'mae', 'qlike_raw', 'qlike'])
     text += '''
 
+HAR-weekday improves both raw and calibrated QLIKE over original HAR-RV at every
+horizon in both groups. It narrows the fine-tuned model's apparent advantage:
+the frozen small full model still has a lower next-day raw QLIKE point estimate
+(almost tied on held-out symbols), but HAR-weekday
+has lower next-day calibrated QLIKE in both groups. These are metric-dependent gains.
+
 The one-factor small-model grid uses full fine-tuning and LoRA rank 16 for contexts
 32/64/128/256 and earliest training-window fractions 10/25/50/100%; the rank sweep
 uses 4/8/16/32 with context 256 and all training windows. Three seeds are used everywhere.
@@ -60,6 +66,11 @@ choices are frozen and are not replaced by test winners:
 ![Rank parameter counts](results/stage5_rank_parameters.png)
 
 Calibrated counterparts are saved as `results/stage5_{context,fraction,rank}_qlike.png`.
+The 32-day context worsens next-day raw QLIKE relative to 256 for both training
+modes and both symbol groups. The rank sweep shows little separation in raw QLIKE
+despite an eightfold increase in adapter parameters from rank 4 to rank 32.
+Longer-horizon and calibrated curves are not uniformly monotone; none of these
+test curves changes the validation-frozen headline configuration.
 The full [ablation table](results/stage5_ablation_summary.csv) includes both QLIKE
 variants, RMSE/MAE, 95% seed/date block-bootstrap CIs, costs, and HAC/Harvey DM tests
 against HAR-RV and HAR-weekday. Metrics average seed-specific losses, not ensemble
@@ -106,6 +117,11 @@ No small-model run is extended, and no Stage 4 number or frozen headline is repl
     text += markdown(extension_cost, ['seed', 'best_epoch', 'epochs_completed', 'best_validation_loss'])
     text += '\n\n' + ('At least one extended seed still selected epoch 8.' if extension_cost.best_epoch.eq(8).any()
                         else 'No extended seed selected the final eight-epoch cap.')
+    drift = pd.read_csv(results / 'stage5_extended_reproducibility.csv').max_validation_loss_difference.max()
+    text += (f' Shared-epoch validation losses differ from the original runs by at most {drift:.8g}; '
+        'the best epochs are unchanged. Cached training/validation tensor values are exactly equal '
+        'to Stage 4, but their memory layout differs. The retraining is not bit-identical. '
+        'This is separate from the nine reused prediction sets, which are exactly identical.')
     text += '\n\n' + markdown(extended, ['symbol_group', 'horizon', 'rmse', 'mae', 'qlike_raw', 'qlike'])
     text += f'\n\nNew training used {new.fit_seconds.sum()/60:.1f} minutes across {len(new)} runs; '
     text += f'{costs.reused_from.notna().sum()} runs reused Stage 4. Peak training allocation was '

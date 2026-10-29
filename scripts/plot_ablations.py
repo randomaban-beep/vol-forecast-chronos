@@ -15,9 +15,9 @@ from src.regimes import regime_thresholds, analyze_regimes
 def plot_curves(results: Path) -> None:
     """Plot test reporting curves without selecting configurations from them."""
     table = pd.read_csv(results / 'stage5_ablation_summary.csv')
-    for axis, label in [('context', 'Context days'), ('fraction', 'Fraction of earliest train windows'), ('rank', 'LoRA rank')]:
+    for axis, label in [('context', 'Context days'), ('fraction', 'Training fraction (earliest windows)'), ('rank', 'LoRA rank')]:
         for metric in ['qlike_raw', 'qlike']:
-            fig, axes = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
+            fig, axes = plt.subplots(2, 3, figsize=(12, 6.5))
             for i, group in enumerate(['fit-eligible', 'held-out']):
                 for j, horizon in enumerate([1, 5, 22]):
                     ax = axes[i, j]
@@ -27,15 +27,19 @@ def plot_curves(results: Path) -> None:
                         data = data.sort_values('value')
                         ax.plot(data.value, data[metric], 'o-', label=mode)
                         ax.fill_between(data.value, data[metric+'_lo'], data[metric+'_hi'], alpha=.12)
-                    ax.set(title=f'{group}, h={horizon}', xlabel=label, ylabel=metric)
+                    ax.set(title=f'{group}, h={horizon}', xlabel=label,
+                           ylabel='Raw QLIKE' if metric == 'qlike_raw' else 'Calibrated QLIKE')
+                    ax.set_xticks(sorted(rows.value.unique()))
                     ax.grid(alpha=.2)
                     ax.legend(fontsize=8)
-            fig.suptitle('Test reporting only; frozen Stage 4 headline unchanged. Bands: 95% seed/date block CI.')
+            fig.suptitle('Test reporting only; frozen Stage 4 headline unchanged. Bands: 95% seed/date block CI.', fontsize=11)
+            fig.tight_layout(rect=[0, 0, 1, .95])
             fig.savefig(results / f'stage5_{axis}_{metric}.png', dpi=150)
             plt.close(fig)
     ranks = table.loc[table.axis.eq('rank')].drop_duplicates('value').sort_values('value')
     fig, ax = plt.subplots(figsize=(6, 4), constrained_layout=True)
     ax.plot(ranks.value, ranks.trainable_parameters, 'o-')
+    ax.set_xticks(ranks.value)
     ax.set(xlabel='LoRA rank', ylabel='Trainable parameters', title='Small-model adapter size')
     ax.grid(alpha=.2)
     fig.savefig(results / 'stage5_rank_parameters.png', dpi=150)
@@ -55,7 +59,7 @@ def error_analysis(scored: pd.DataFrame, selection: pd.DataFrame, daily: pd.Data
         actual_rv, predicted_rv = np.exp(row.target), np.exp(row.prediction)
         previous = float(series.loc[row.origin, 'rv'])
         segment = series.loc[row.origin-pd.Timedelta(days=30):row.target_end+pd.Timedelta(days=5)]
-        fig, ax = plt.subplots(figsize=(9, 4), constrained_layout=True)
+        fig, ax = plt.subplots(figsize=(9, 4))
         ax.plot(segment.index, segment.y, '.-', label='Observed daily log RV')
         ax.axvline(row.origin, color='gray', linestyle='--', label='Forecast origin')
         ax.errorbar([row.target_end], [row.prediction],
@@ -67,6 +71,7 @@ def error_analysis(scored: pd.DataFrame, selection: pd.DataFrame, daily: pd.Data
         ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
         ax.legend(fontsize=8)
         ax.grid(alpha=.2)
+        fig.tight_layout()
         fig.savefig(results / f'stage5_worst_{rank}.png', dpi=150)
         plt.close(fig)
         change = actual_rv / previous
