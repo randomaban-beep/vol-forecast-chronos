@@ -24,12 +24,13 @@ def main() -> None:
             shutil.copytree(project/folder,destination/folder,ignore=shutil.ignore_patterns('__pycache__'))
         for file in ['README.md','pyproject.toml','AGENTS.md','LICENSE','CITATION.cff']:
             shutil.copy2(project/file,destination/file)
-        for script in ['download_data.py','run_baselines.py','run_zero_shot.py','run_finetune.py','reproduce_stage5.py','package_results.py','make_readme_figures.py','write_readme.py']:
+        for script in ['download_data.py','run_baselines.py','run_zero_shot.py','run_finetune.py','reproduce_stage5.py','package_results.py','compute_extended_metrics.py','make_readme_figures.py','write_readme.py']:
             subprocess.run([sys.executable,str(destination/'scripts'/script)],cwd=destination,check=True)
         print(f'Fresh experiment outputs: {destination}')
         return
     if args.rescore:
         subprocess.run([sys.executable,'scripts/package_results.py'],check=True,cwd=project)
+        subprocess.run([sys.executable,'scripts/compute_extended_metrics.py'],check=True,cwd=project)
     start=time.perf_counter()
     for script in ['make_readme_figures.py','write_readme.py']:
         subprocess.run([sys.executable,f'scripts/{script}'],check=True,cwd=project)

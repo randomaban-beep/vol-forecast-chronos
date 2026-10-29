@@ -52,3 +52,16 @@ def test_historical_results_preserved():
     for row in audit.itertuples():
         assert row.before_sha256==row.after_sha256
         assert hashlib.sha256(Path(row.path).read_bytes()).hexdigest()==row.before_sha256
+
+
+def test_extended_metrics_sanity():
+    path = Path('results/stage6_extended_metrics.csv')
+    assert path.is_file()
+    df = pd.read_csv(path)
+    assert len(df) == 48
+    assert set(df.symbol_group.unique()) == {'fit-eligible', 'held-out'}
+    assert set(df.horizon.unique()) == {1, 5, 22}
+    assert (df.mda_pct >= 0).all() and (df.mda_pct <= 100).all()
+    assert (df.mdape_pct > 0).all()
+    assert (df.r2_mz_pct >= 0).all() and (df.r2_mz_pct <= 100).all()
+    assert (df.pinball_90 > 0).all()

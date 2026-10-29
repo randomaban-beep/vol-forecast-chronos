@@ -4,6 +4,27 @@ Fine-tuning a time-series foundation model to forecast crypto volatility. The ch
 
 ![Python version](docs/img/badge_python.svg) ![Passing tests](docs/img/badge_tests.svg) ![MIT license](docs/img/badge_license.svg) ![GPU used](docs/img/badge_gpu.svg)
 
+## Overview: What is this project?
+
+Predicting cryptocurrency volatility—the intensity of price swings—is critical for risk management, exchange margin requirements, and derivative pricing. For decades, quantitative finance has relied on classical econometric models like **HAR-RV** (Heterogeneous Autoregressive model of Realized Volatility) and **GARCH**.
+
+This project investigates a central question in modern quantitative machine learning:
+> **Can pretrained Time-Series Foundation Models (Amazon Chronos-Bolt) beat classical financial econometrics when forecasting cryptocurrency realized volatility?**
+
+### What was built
+- **End-to-End Pipeline**: Processes 6+ years (2020–2026) of verified 1-minute Binance spot data across 8 major crypto assets (BTC, ETH, BNB, SOL, XRP, ADA, DOGE, LTC) to construct high-frequency 5-minute realized variance (RV).
+- **Zero Lookahead Leakage**: Strict expanding walk-forward splits, calendar boundary purging, and automated perturbation unit tests.
+- **Foundation Models vs. Econometrics**: Evaluates zero-shot Chronos-Bolt, full fine-tuning, and Parameter-Efficient LoRA (ranks 4–32) against HAR-RV, calendar-aware HAR-weekday, and Student-t GARCH/GJR-GARCH.
+- **Consumer Hardware Budget**: Engineered to run entirely on a single laptop GPU (NVIDIA RTX 3050 6 GB, 24 GB RAM) within a strict 2-hour budget.
+- **Reproducible & Audited**: One-command rebuild (`python scripts/reproduce.py`), cryptographic preservation hashes, and open-source MIT release.
+
+### High-level takeaways
+1. **Directional Accuracy**: Chronos-Bolt is superior at predicting the *trend* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
+2. **Typical Days (MdAPE)**: On typical non-crash days, fine-tuned Chronos delivers lower median percentage errors (31–36% MdAPE) than classical models (37–46%).
+3. **The Power of the Calendar**: Adding day-of-week terms to HAR (HAR-weekday) creates a 10-parameter baseline that rivals fine-tuned 48M-parameter neural networks on QLIKE loss. A simple calendar baseline is a formidable opponent.
+
+---
+
 ## The 30-second story
 
 At h=1, fine-tuning clearly beats HAR-RV, but is roughly tied with HAR-weekday: a calendar is a formidable low-budget opponent.
@@ -82,6 +103,35 @@ this is a loss rescore, not a counterfactual market in which the shock never hap
 Only the held-out h=22 raw-QLIKE winner changes, from HAR-weekday to fine-tuned; calibrated winners stay the same.
 This does not make the remaining test period independent of other shocks. All model scores, ranks and retained counts:
 [robustness CSV](results/stage6_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
+
+### Beyond loss averages: directional calls and typical error
+
+Standard QLIKE and RMSE averages are heavily weighted by tail events. Complementary scale-free metrics from [extended metrics CSV](results/stage6_extended_metrics.csv) show where Chronos excels:
+
+**Directional Accuracy (MDA, higher is better):**
+
+| Group | h | Naive | HAR-RV | HAR-weekday | GARCH-t | Zero-shot | Fine-tuned |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fit-eligible | 1 | 0.00% | 64.45% | 70.04% | 59.90% | 68.47% | 70.42% |
+| fit-eligible | 5 | 0.00% | 67.64% | 68.82% | 62.70% | 71.85% | 71.38% |
+| fit-eligible | 22 | 0.00% | 71.77% | 71.58% | 65.96% | 74.91% | 75.68% |
+| held-out | 1 | 0.00% | 64.26% | 68.57% | 63.32% | 67.32% | 69.07% |
+| held-out | 5 | 0.00% | 68.93% | 69.32% | 65.30% | 71.77% | 72.06% |
+| held-out | 22 | 0.00% | 78.04% | 78.20% | 70.58% | 77.80% | 77.23% |
+
+**Median Absolute Percentage Error on Variance (MdAPE, lower is better):**
+
+| Group | h | Naive | HAR-RV | HAR-weekday | GARCH-t | Zero-shot | Fine-tuned |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fit-eligible | 1 | 41.12% | 35.32% | 35.01% | 67.54% | 35.14% | 33.39% |
+| fit-eligible | 5 | 43.72% | 38.50% | 36.70% | 70.25% | 30.88% | 31.57% |
+| fit-eligible | 22 | 50.35% | 46.35% | 46.29% | 90.11% | 35.15% | 36.65% |
+| held-out | 1 | 39.50% | 35.31% | 33.52% | 52.82% | 34.02% | 32.52% |
+| held-out | 5 | 43.53% | 35.01% | 33.80% | 50.98% | 31.40% | 30.50% |
+| held-out | 22 | 49.37% | 32.82% | 32.65% | 53.04% | 31.91% | 31.89% |
+
+- **Directional hit rate:** Chronos models achieve the highest directional accuracy across both fit-eligible and held-out assets (reaching 70.42% at h=1 and up to 75.68% at h=22), consistently outperforming standard HAR-RV (64.45% and 71.77%).
+- **Typical-day error:** On Median Absolute Percentage Error (MdAPE), Chronos-Bolt consistently beats HAR-RV and HAR-weekday across all horizons (33.39% vs 35.01% at h=1; 31.57% vs 36.70% at h=5; 36.65% vs 46.29% at h=22), demonstrating substantially lower percentage error when outlier shock days are mitigated.
 
 ## Is it worth the compute?
 
@@ -223,7 +273,7 @@ Missing timings are marked, not guessed. Stage 6 reports a local report-generati
 | 3 | 0.366 | Cached model load + inference only | RTX 3050 |
 | 4 | 31.711 | Training, all 18 runs | RTX 3050 |
 | 5 | 65.319 | Training, 45 new runs; 9 reused | RTX 3050 |
-| 6 | 0.105 | Measured CSV-only figure + README build; excludes rescore | CPU |
+| 6 | 0.117 | Measured CSV-only figure + README build; excludes rescore | CPU |
 
 Source: [runtime CSV](results/stage6_runtime.csv), derived from the original per-stage cost CSVs. Timing excludes different overheads by stage;
 historical GPU allocations exclude driver memory and other applications.

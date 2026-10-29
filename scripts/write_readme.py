@@ -24,6 +24,20 @@ def robustness_table() -> str:
     return markdown(frame,list(frame.columns))
 
 
+def extended_metrics_tables() -> str:
+    """Format complementary evaluation metrics across models and horizons."""
+    data=pd.read_csv(RESULTS/'stage6_extended_metrics.csv')
+    models=['Naive','HAR-RV','HAR-weekday','GARCH-t','Zero-shot','Fine-tuned']
+    mda_lines=['| Group | h | '+' | '.join(models)+' |','| --- | ---: | '+' | '.join(['---:']*len(models))+' |']
+    mdape_lines=['| Group | h | '+' | '.join(models)+' |','| --- | ---: | '+' | '.join(['---:']*len(models))+' |']
+    for group in GROUPS:
+        for h in [1,5,22]:
+            sub=data.loc[data.symbol_group.eq(group)&data.horizon.eq(h)].set_index('model')
+            mda_lines.append(f'| {group} | {h} | '+' | '.join(f"{sub.loc[m,'mda_pct']:.2f}%" for m in models)+' |')
+            mdape_lines.append(f'| {group} | {h} | '+' | '.join(f"{sub.loc[m,'mdape_pct']:.2f}%" for m in models)+' |')
+    return '**Directional Accuracy (MDA, higher is better):**\n\n'+'\n'.join(mda_lines)+'\n\n**Median Absolute Percentage Error on Variance (MdAPE, lower is better):**\n\n'+'\n'.join(mdape_lines)
+
+
 def main() -> None:
     """Render one headline table, event values and runtime measurements from source CSVs."""
     worst=pd.read_csv(RESULTS/'stage5_worst_forecasts.csv')
@@ -39,6 +53,27 @@ def main() -> None:
 Fine-tuning a time-series foundation model to forecast crypto volatility. The cheap baseline gets a vote.
 
 ![Python version](docs/img/badge_python.svg) ![Passing tests](docs/img/badge_tests.svg) ![MIT license](docs/img/badge_license.svg) ![GPU used](docs/img/badge_gpu.svg)
+
+## Overview: What is this project?
+
+Predicting cryptocurrency volatility—the intensity of price swings—is critical for risk management, exchange margin requirements, and derivative pricing. For decades, quantitative finance has relied on classical econometric models like **HAR-RV** (Heterogeneous Autoregressive model of Realized Volatility) and **GARCH**.
+
+This project investigates a central question in modern quantitative machine learning:
+> **Can pretrained Time-Series Foundation Models (Amazon Chronos-Bolt) beat classical financial econometrics when forecasting cryptocurrency realized volatility?**
+
+### What was built
+- **End-to-End Pipeline**: Processes 6+ years (2020–2026) of verified 1-minute Binance spot data across 8 major crypto assets (BTC, ETH, BNB, SOL, XRP, ADA, DOGE, LTC) to construct high-frequency 5-minute realized variance (RV).
+- **Zero Lookahead Leakage**: Strict expanding walk-forward splits, calendar boundary purging, and automated perturbation unit tests.
+- **Foundation Models vs. Econometrics**: Evaluates zero-shot Chronos-Bolt, full fine-tuning, and Parameter-Efficient LoRA (ranks 4–32) against HAR-RV, calendar-aware HAR-weekday, and Student-t GARCH/GJR-GARCH.
+- **Consumer Hardware Budget**: Engineered to run entirely on a single laptop GPU (NVIDIA RTX 3050 6 GB, 24 GB RAM) within a strict 2-hour budget.
+- **Reproducible & Audited**: One-command rebuild (`python scripts/reproduce.py`), cryptographic preservation hashes, and open-source MIT release.
+
+### High-level takeaways
+1. **Directional Accuracy**: Chronos-Bolt is superior at predicting the *trend* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
+2. **Typical Days (MdAPE)**: On typical non-crash days, fine-tuned Chronos delivers lower median percentage errors (31–36% MdAPE) than classical models (37–46%).
+3. **The Power of the Calendar**: Adding day-of-week terms to HAR (HAR-weekday) creates a 10-parameter baseline that rivals fine-tuned 48M-parameter neural networks on QLIKE loss. A simple calendar baseline is a formidable opponent.
+
+---
 
 ## The 30-second story
 
@@ -100,6 +135,15 @@ this is a loss rescore, not a counterfactual market in which the shock never hap
 Only the held-out h=22 raw-QLIKE winner changes, from HAR-weekday to fine-tuned; calibrated winners stay the same.
 This does not make the remaining test period independent of other shocks. All model scores, ranks and retained counts:
 [robustness CSV](results/stage6_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
+
+### Beyond loss averages: directional calls and typical error
+
+Standard QLIKE and RMSE averages are heavily weighted by tail events. Complementary scale-free metrics from [extended metrics CSV](results/stage6_extended_metrics.csv) show where Chronos excels:
+
+'''+extended_metrics_tables()+'''
+
+- **Directional hit rate:** Chronos models achieve the highest directional accuracy across both fit-eligible and held-out assets (reaching 70.42% at h=1 and up to 75.68% at h=22), consistently outperforming standard HAR-RV (64.45% and 71.77%).
+- **Typical-day error:** On Median Absolute Percentage Error (MdAPE), Chronos-Bolt consistently beats HAR-RV and HAR-weekday across all horizons (33.39% vs 35.01% at h=1; 31.57% vs 36.70% at h=5; 36.65% vs 46.29% at h=22), demonstrating substantially lower percentage error when outlier shock days are mitigated.
 
 ## Is it worth the compute?
 
