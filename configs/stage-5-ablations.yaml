@@ -1,0 +1,13 @@
+seed: 42
+seeds: [42, 43, 44]
+contexts: [32, 64, 128, 256]
+fractions: [0.1, 0.25, 0.5, 1.0]
+ranks: [4, 8, 16, 32]
+main_modes: [full, lora16]
+extended_max_epochs: 8
+selection_metric: mean_seed_validation_rmse
+bootstrap_reps: 1000
+block_length: 30
+held_out: [SOLUSDT, DOGEUSDT]
+cache: data
+results: results

@@ -1,0 +1,3 @@
+split,values_identical,original_context_strides,cached_context_strides
+train,True,"(1024, 4)","(4, 23560)"
+validation,True,"(1024, 4)","(4, 8280)"

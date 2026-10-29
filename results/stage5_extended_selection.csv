@@ -1,0 +1,3 @@
+mode,cap_hit,mean_validation_loss,selected
+lora16,True,12.119308097274214,True
+lora8,True,12.15165597083296,False

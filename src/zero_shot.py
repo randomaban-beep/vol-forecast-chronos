@@ -27,8 +27,8 @@ def common_template(baselines: pd.DataFrame) -> pd.DataFrame:
 def build_contexts(daily: pd.DataFrame, template: pd.DataFrame,
                    length: int = 256) -> tuple[pd.DataFrame, np.ndarray]:
     """Read origin-length+1 through origin inclusive; keep missing days as NaN."""
-    if length != 256:
-        raise ValueError("Stage 3 requires 256 calendar days")
+    if length not in (32, 64, 128, 256):
+        raise ValueError("Supported context lengths: 32, 64, 128, 256")
     if daily.duplicated(["symbol", "date"]).any():
         raise ValueError("Duplicate daily dates")
     origins = template[["split", "symbol", "origin"]].drop_duplicates().sort_values(
