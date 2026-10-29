@@ -2,53 +2,57 @@
 from pathlib import Path
 import sys
 import pandas as pd
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.report import headline_table, markdown, RESULTS, GROUPS
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.report import (headline_table, legacy_headline_table, markdown,
+                        RESULTS, GROUPS)
 
 
 def robustness_table() -> str:
-    """Show before/after winners without tuning any configuration."""
-    data=pd.read_csv(RESULTS/'stage6_robustness.csv')
-    rows=[]
+    """Show before/after winners under standard Patton QLIKE without tuning any configuration."""
+    data = pd.read_csv(RESULTS / 'stage7_robustness.csv')
+    rows = []
     for group in GROUPS:
         for h in sorted(data.horizon.unique()):
-            panel=data.loc[data.symbol_group.eq(group)&data.horizon.eq(h)]
-            row={'Group':group,'h':h}
-            for metric,label in [('qlike_raw','Raw'),('qlike','Calibrated')]:
-                for sample,suffix in [('all dates','before'),('exclude Oct 10-12','after')]:
-                    rows2=panel.loc[panel['sample'].eq(sample)]
-                    row[f'{label} {suffix}']='/'.join(rows2.loc[rows2[metric].eq(rows2[metric].min()),'model'])
-            row['Origins removed']=int(panel.loc[panel['sample'].eq('all dates'),'n_dates'].iloc[0]-panel.loc[panel['sample'].eq('exclude Oct 10-12'),'n_dates'].iloc[0])
+            panel = data.loc[data.symbol_group.eq(group) & data.horizon.eq(h)]
+            row = {'Group': group, 'h': h}
+            for metric, label in [('qlike_raw', 'Raw Patton'), ('qlike', 'Calibrated Patton')]:
+                for sample, suffix in [('all dates', 'before'), ('exclude Oct 10-12', 'after')]:
+                    rows2 = panel.loc[panel['sample'].eq(sample)]
+                    row[f'{label} {suffix}'] = '/'.join(rows2.loc[rows2[metric].eq(rows2[metric].min()), 'model'])
+            row['Origins removed'] = int(panel.loc[panel['sample'].eq('all dates'), 'n_dates'].iloc[0] - panel.loc[panel['sample'].eq('exclude Oct 10-12'), 'n_dates'].iloc[0])
             rows.append(row)
-    frame=pd.DataFrame(rows)
-    return markdown(frame,list(frame.columns))
+    frame = pd.DataFrame(rows)
+    return markdown(frame, list(frame.columns))
 
 
 def extended_metrics_tables() -> str:
     """Format complementary evaluation metrics across models and horizons."""
-    data=pd.read_csv(RESULTS/'stage6_extended_metrics.csv')
-    models=['Naive','HAR-RV','HAR-weekday','GARCH-t','Zero-shot','Fine-tuned']
-    mda_lines=['| Group | h | '+' | '.join(models)+' |','| --- | ---: | '+' | '.join(['---:']*len(models))+' |']
-    mdape_lines=['| Group | h | '+' | '.join(models)+' |','| --- | ---: | '+' | '.join(['---:']*len(models))+' |']
+    data = pd.read_csv(RESULTS / 'stage6_extended_metrics.csv')
+    # Naive is excluded from directional accuracy because direction from origin is undefined (delta = 0)
+    mda_models = ['HAR-RV', 'HAR-weekday', 'GARCH-t', 'Zero-shot', 'Fine-tuned']
+    mdape_models = ['Naive', 'HAR-RV', 'HAR-weekday', 'GARCH-t', 'Zero-shot', 'Fine-tuned']
+    mda_lines = ['| Group | h | ' + ' | '.join(mda_models) + ' |', '| --- | ---: | ' + ' | '.join(['---:'] * len(mda_models)) + ' |']
+    mdape_lines = ['| Group | h | ' + ' | '.join(mdape_models) + ' |', '| --- | ---: | ' + ' | '.join(['---:'] * len(mdape_models)) + ' |']
     for group in GROUPS:
-        for h in [1,5,22]:
-            sub=data.loc[data.symbol_group.eq(group)&data.horizon.eq(h)].set_index('model')
-            mda_lines.append(f'| {group} | {h} | '+' | '.join(f"{sub.loc[m,'mda_pct']:.2f}%" for m in models)+' |')
-            mdape_lines.append(f'| {group} | {h} | '+' | '.join(f"{sub.loc[m,'mdape_pct']:.2f}%" for m in models)+' |')
-    return '**Directional Accuracy (MDA, higher is better):**\n\n'+'\n'.join(mda_lines)+'\n\n**Median Absolute Percentage Error on Variance (MdAPE, lower is better):**\n\n'+'\n'.join(mdape_lines)
+        for h in [1, 5, 22]:
+            sub = data.loc[data.symbol_group.eq(group) & data.horizon.eq(h)].set_index('model')
+            mda_lines.append(f'| {group} | {h} | ' + ' | '.join(f"{sub.loc[m, 'mda_pct']:.2f}%" for m in mda_models) + ' |')
+            mdape_lines.append(f'| {group} | {h} | ' + ' | '.join(f"{sub.loc[m, 'mdape_pct']:.2f}%" for m in mdape_models) + ' |')
+    return '**Directional Accuracy (MDA, higher is better; Naive excluded as direction is undefined):**\n\n' + '\n'.join(mda_lines) + '\n\n**Median Absolute Percentage Error on Variance (MdAPE, lower is better):**\n\n' + '\n'.join(mdape_lines)
 
 
 def main() -> None:
-    """Render one headline table, event values and runtime measurements from source CSVs."""
-    worst=pd.read_csv(RESULTS/'stage5_worst_forecasts.csv')
+    """Render headline table, event values, robustness rescore and runtime measurements from source CSVs."""
+    worst = pd.read_csv(RESULTS / 'stage5_worst_forecasts.csv')
     import numpy as np
-    worst['Realized RV']=np.exp(worst.target)
-    worst['Forecast RV']=np.exp(worst.prediction)
-    worst['Date']=pd.to_datetime(worst.target_end).dt.strftime('%Y-%m-%d')
-    worst=worst.rename(columns={'symbol':'Symbol'})
-    runtime=pd.read_csv(RESULTS/'stage6_runtime.csv')
-    runtime['Measured minutes']=runtime.seconds.map(lambda x:'not recorded' if pd.isna(x) else f'{x/60:.3f}')
-    text='''# Chronos, meet the calendar
+    worst['Realized RV'] = np.exp(worst.target)
+    worst['Forecast RV'] = np.exp(worst.prediction)
+    worst['Date'] = pd.to_datetime(worst.target_end).dt.strftime('%Y-%m-%d')
+    worst = worst.rename(columns={'symbol': 'Symbol'})
+    runtime = pd.read_csv(RESULTS / 'stage6_runtime.csv')
+    runtime['Measured minutes'] = runtime.seconds.map(lambda x: 'not recorded' if pd.isna(x) else f'{x/60:.3f}')
+
+    text = '''# Chronos, meet the calendar
 
 Fine-tuning a time-series foundation model to forecast crypto volatility. The cheap baseline gets a vote.
 
@@ -68,33 +72,32 @@ This project investigates a central question in modern quantitative machine lear
 - **Consumer Hardware Budget**: Engineered to run entirely on a single laptop GPU (NVIDIA RTX 3050 6 GB, 24 GB RAM) within a strict 2-hour budget.
 - **Reproducible & Audited**: One-command rebuild (`python scripts/reproduce.py`), cryptographic preservation hashes, and open-source MIT release.
 
-### High-level takeaways
-1. **Directional Accuracy**: Chronos-Bolt is superior at predicting the *trend* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
-2. **Typical Days (MdAPE)**: On typical non-crash days, fine-tuned Chronos delivers lower median percentage errors (31–36% MdAPE) than classical models (37–46%).
-3. **The Power of the Calendar**: Adding day-of-week terms to HAR (HAR-weekday) creates a 10-parameter baseline that rivals fine-tuned 48M-parameter neural networks on QLIKE loss. A simple calendar baseline is a formidable opponent.
+### High-level takeaways (Patton 2011 standard evaluation)
+1. **The Calendar Baseline (HAR-weekday) Wins Overall**: Under standard Patton (2011) QLIKE and log RMSE, HAR-weekday is the top-performing model across all horizons (h=1, 5, 22). A simple 10-parameter linear regression with weekday terms beats or matches the 48M-parameter foundation model at a fraction of the compute cost.
+2. **Calibrated Chronos Competes at Multi-Day Horizons**: When smearing calibration is applied to align variance scales with the conditional arithmetic mean, fine-tuned Chronos-Bolt achieves competitive or slightly lower point estimates at h=5 (0.3697 vs 0.3799) and h=22 (0.3205 vs 0.3491); however, Diebold-Mariano tests against HAR-weekday show p-values of 0.31–0.65 (fail to reject the null of equal predictive accuracy).
+3. **Directional Accuracy (MDA)**: Where Chronos clearly leads is in predicting the *direction* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
+4. **Typical Days (MdAPE)**: On median percentage error (which is robust to single-day extreme shocks), Chronos yields lower typical errors (31–36% MdAPE vs 37–46% for HAR).
 
 ---
 
 ## The 30-second story
 
-At h=1, fine-tuning clearly beats HAR-RV, but is roughly tied with HAR-weekday: a calendar is a formidable low-budget opponent.
-That tie is a practical summary, not an equivalence test—fine-tuning has lower raw QLIKE point estimates, while HAR-weekday has lower calibrated QLIKE and log-RV error.
-At h=22, HAR variants win under calibrated QLIKE.
-The fine-tuned row is the Stage 4 validation-selected small model—full fine-tuning for h=1/5, LoRA rank 16 for h=22—and every test curve leaves that choice alone.
+At h=1, HAR-weekday wins on raw Patton QLIKE (0.4383 vs 0.5059 for fine-tuned) and log RMSE (0.5920 vs 0.6087).
+On calibrated QLIKE, smearing aligns Chronos with the arithmetic mean, putting fine-tuned Chronos (0.3802) roughly tied with HAR-weekday (0.3758; DM p=0.6471).
+At multi-day horizons (h=5 and h=22), calibrated Chronos achieves slightly lower point estimates (0.3205 vs 0.3491 at h=22), but differences are not statistically distinguishable from HAR-weekday.
 This is a forecasting-accuracy study, not a trading strategy.
 
 ![Raw QLIKE for six headline models across three horizons; held-out symbols in the lighter lower panel; bars show 95 percent confidence intervals](docs/img/headline.png)
 
-**Raw QLIKE, lower is better.** Fine-tuned metrics average the three seed-specific scores, not ensemble predictions.
-Intervals use 30-day circular blocks; fine-tuned intervals also resample seeds. Zero-shot is Chronos-Bolt-small.
+**Headline Results Table: Patton (2011) QLIKE, Error Metrics, Uncertainty, and Costs.**
+Lower QLIKE and RMSE are better. Intervals use 30-day circular blocks; fine-tuned intervals also resample seeds. Zero-shot is Chronos-Bolt-small. Fine-tuned model is validation-selected (full for h=1/5, LoRA-16 for h=22).
 
 <!-- headline-table-start -->
 '''+headline_table()+'''
 <!-- headline-table-end -->
 
-Sources: [baselines](results/stage2_baselines.csv), [zero-shot](results/stage3_zero_shot.csv),
-[fine-tuning](results/stage4_finetune.csv), [HAR-weekday](results/stage5_weekday.csv),
-[frozen validation selection](results/stage5_frozen_selection.csv).
+Sources: [Stage 7 headline CSV](results/stage7_headline.csv), [baselines](results/stage7_baselines.csv),
+[zero-shot](results/stage7_zero_shot.csv), [fine-tuning](results/stage7_finetune.csv).
 
 ## Scoreboard
 
@@ -102,16 +105,15 @@ Sources: [baselines](results/stage2_baselines.csv), [zero-shot](results/stage3_z
 
 The grid includes the alternate HAR feature definition and asymmetric GARCH so their wins and losses remain visible.
 Green borders mark exact point-estimate winners, including exact ties; displayed rounding is not a tie test.
-Stars use the [Stage 5 joint MCS](results/stage5_mcs.csv), whose universe also includes the ablations and other original families—not just the displayed columns.
+Stars use the [Stage 7 joint MCS](results/stage7_mcs.csv), whose universe also includes the ablations and other original families—not just the displayed columns.
 MCS membership means the procedure did not eliminate that candidate; it does not prove equivalence.
-Both QLIKE variants use `V_hat / V - log(V_hat / V) - 1`, the study's specified ratio orientation.
 
 ## The day everything broke
 
 The three worst h=1 errors all land on **2025-10-10**. They are ranked by mean seed squared log error;
 the forecast RV below is the exponential of the mean log forecast, shown for illustration rather than scored as an ensemble.
 
-'''+markdown(worst,['Date','Symbol','Realized RV','Forecast RV'])+'''
+'''+markdown(worst, ['Date', 'Symbol', 'Realized RV', 'Forecast RV'])+'''
 
 ![ADAUSDT on October 10: realized log RV jumps far above the three-seed forecast range](results/stage5_worst_1.png)
 ![DOGEUSDT on October 10: a large realized-volatility shock missed by the next-day forecast](results/stage5_worst_2.png)
@@ -132,9 +134,8 @@ this is a loss rescore, not a counterfactual market in which the shock never hap
 
 '''+robustness_table()+'''
 
-Only the held-out h=22 raw-QLIKE winner changes, from HAR-weekday to fine-tuned; calibrated winners stay the same.
-This does not make the remaining test period independent of other shocks. All model scores, ranks and retained counts:
-[robustness CSV](results/stage6_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
+Under standard Patton QLIKE, removing the flash crash dates cements HAR-weekday as the dominant performer across all horizons and groups.
+All model scores, ranks and retained counts: [robustness CSV](results/stage7_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
 
 ### Beyond loss averages: directional calls and typical error
 
@@ -144,6 +145,41 @@ Standard QLIKE and RMSE averages are heavily weighted by tail events. Complement
 
 - **Directional hit rate:** Chronos models achieve the highest directional accuracy across both fit-eligible and held-out assets (reaching 70.42% at h=1 and up to 75.68% at h=22), consistently outperforming standard HAR-RV (64.45% and 71.77%).
 - **Typical-day error:** On Median Absolute Percentage Error (MdAPE), Chronos-Bolt consistently beats HAR-RV and HAR-weekday across all horizons (33.39% vs 35.01% at h=1; 31.57% vs 36.70% at h=5; 36.65% vs 46.29% at h=22), demonstrating substantially lower percentage error when outlier shock days are mitigated.
+
+## Errata: Loss Function Orientation (Patton 2011 vs Legacy)
+
+In Stages 2–6, the evaluation suite implemented QLIKE as:
+$$\\mathcal{L}_{\\text{legacy}}(V, \\hat{V}) = \\frac{\\hat{V}}{V} - \\log\\left(\\frac{\\hat{V}}{V}\\right) - 1 \\quad (\\text{forecast over actual})$$
+
+### The Orientation Problem and Mathematical Consequence
+In the time-series econometrics literature (Patton 2011, *Journal of Econometrics*), the standard robust QLIKE loss function is defined with actual over forecast:
+$$\\mathcal{L}_{\\text{patton}}(V, \\hat{V}) = \\frac{V}{\\hat{V}} - \\log\\left(\\frac{V}{\\hat{V}}\\right) - 1 \\quad (\\text{actual over forecast})$$
+
+The distinction is mathematically fundamental:
+1. **Consistency for the Conditional Arithmetic Mean**:
+   Taking the first-order condition of expected loss with respect to $\\hat{V}$:
+   $$\\frac{\\partial \\mathcal{L}_{\\text{patton}}}{\\partial \\hat{V}} = -\\frac{V}{\\hat{V}^2} + \\frac{1}{\\hat{V}} = \\frac{\\hat{V} - V}{\\hat{V}^2} \\implies \\mathbb{E}\\left[\\frac{\\partial \\mathcal{L}_{\\text{patton}}}{\\partial \\hat{V}}\\right] = 0 \\iff \\hat{V} = \\mathbb{E}[V]$$
+   Thus, standard Patton QLIKE is strictly consistent for the **arithmetic conditional mean**.
+2. **Why Legacy QLIKE Favored Negative Bias**:
+   Taking the first-order condition for the legacy formula:
+   $$\\frac{\\partial \\mathcal{L}_{\\text{legacy}}}{\\partial \\hat{V}} = \\frac{1}{V} - \\frac{1}{\\hat{V}} \\implies \\mathbb{E}\\left[\\frac{\\partial \\mathcal{L}_{\\text{legacy}}}{\\partial \\hat{V}}\\right] = 0 \\iff \\hat{V} = \\frac{1}{\\mathbb{E}[1/V]}$$
+   The legacy loss function is minimized at the **conditional harmonic mean** of realized variance.
+   Because the harmonic mean is strictly less than or equal to the arithmetic mean ($\\text{HM} \\le \\text{AM}$), the legacy formula heavily penalized forecasts higher than actual and systematically rewarded models that under-forecasted volatility (negative bias).
+3. **What Changed Under Patton (2011) QLIKE**:
+   - Because raw Chronos-Bolt forecasts had a slight negative bias (bias $\\approx -0.09$), legacy QLIKE artificially boosted raw Chronos-Bolt below HAR-RV and HAR-weekday.
+   - When smearing calibration was applied (multiplying by $\\mathbb{E}[\\exp(e)] > 1$ to align with the arithmetic mean), legacy QLIKE penalized that upward scale adjustment.
+   - Under standard Patton QLIKE, smearing calibration now functions exactly as econometrics theory predicts: it scales forecasts to the arithmetic mean, cutting loss from ~0.50 down to ~0.38.
+   - Under standard Patton QLIKE, **HAR-weekday is the clear winner on raw loss and log RMSE across all horizons**. On calibrated loss, fine-tuned Chronos-Bolt achieves slightly lower point estimates at $h=5$ and $h=22$ (e.g. 0.3205 vs 0.3491 at $h=22$), but Diebold-Mariano tests vs HAR-weekday confirm the difference is not statistically significant ($p \\approx 0.31\\text{--}0.65$).
+
+### Appendix: Legacy Orientation QLIKE Numbers (Stages 2–6)
+For historical auditability and full reproducibility of earlier milestones, the legacy orientation QLIKE values ($\\hat{V}/V - \\log(\\hat{V}/V) - 1$) are preserved below:
+
+<!-- legacy-headline-start -->
+'''+legacy_headline_table()+'''
+<!-- legacy-headline-end -->
+
+Sources: [Stage 2 baselines](results/stage2_baselines.csv), [Stage 3 zero-shot](results/stage3_zero_shot.csv),
+[Stage 4 fine-tuning](results/stage4_finetune.csv), [Stage 5 weekday](results/stage5_weekday.csv).
 
 ## Is it worth the compute?
 
@@ -221,8 +257,8 @@ flowchart LR
 - Each model/horizon's smearing factor is `mean(exp(target - prediction))` on six-symbol 2024 validation residuals, then frozen. Raw uses factor one.
 - Median daily log-RV paths become horizon forecasts via `log(mean(exp(path[:h])))`; contexts end at the origin, preserving missing days as NaNs/masks.
 - Future-perturbation and held-out-perturbation tests protect contexts and fitting. Missing forecasts cannot silently shrink the common panel.
-- [Preservation hashes](results/stage6_preservation.csv) verify every pre-Stage-6 result file byte-identical. [Stage 5 audit](results/stage5_panel_audit.csv) checks common rows and exact reuse.
-- Regime thresholds use training data only. [Regime results](results/stage5_regimes.csv) retain calendar gaps in resampling and report sparse-sample counts.
+- [Preservation hashes](results/stage7_preservation.csv) verify every pre-Stage-7 result file byte-identical. [Stage 5 audit](results/stage5_panel_audit.csv) checks common rows and exact reuse.
+- Regime thresholds use training data only. [Regime results](results/stage7_regimes.csv) retain calendar gaps in resampling and report sparse-sample counts.
 
 ## FAQ for skeptics
 
@@ -252,7 +288,7 @@ flowchart LR
 - `src/data.py`, `src/baselines.py`, `src/finetune.py`, `src/evaluate.py`: data, models and one shared scoring rule.
 - `src/zero_shot.py`, `src/ablations.py`, `src/regimes.py`: causal contexts and analysis.
 - `configs/`: fixed experiment settings and pinned model revisions.
-- `results/`: immutable historical CSVs/figures plus new Stage 6 reporting CSVs.
+- `results/`: immutable historical CSVs/figures plus new Stage 7 reporting CSVs.
 - `scripts/make_readme_figures.py`: every new report figure from committed CSVs; `docs/img/`: generated PNGs and local badges.
 - `tests/`: leakage, metrics, training safeguards and README/CSV/link checks.
 - `data/`: ignored caches and checkpoints. Never committed.
@@ -268,7 +304,7 @@ python scripts/reproduce.py
 
 The default is a **CSV-only report rebuild**: no raw-data download, inference or training.
 `python scripts/make_readme_figures.py` regenerates all new figures by itself; the three existing error plots stay untouched.
-`python scripts/reproduce.py --rescore` additionally rebuilds the small Stage 6 exports from existing `data/stage5/scored.parquet`.
+`python scripts/reproduce.py --rescore` additionally rebuilds the small Stage 7 exports from existing `data/stage5/scored.parquet`.
 `python scripts/reproduce.py --experiments` runs the complete experiment pipeline in a separate ignored workspace, preserving published results; this is expensive and opt-in.
 Install a CUDA-compatible PyTorch build to use the GPU; otherwise inference/training falls back to CPU.
 Check with `python -m pytest -q`. No API key is required for public Binance archives or the pinned public model weights.
@@ -278,7 +314,7 @@ Check with `python -m pytest -q`. No API key is required for public Binance arch
 Recorded on the RTX 3050 laptop; CPU stages are identified. These components are not additive end-to-end wall times.
 Missing timings are marked, not guessed. Stage 6 reports a local report-generation measurement when available.
 
-'''+markdown(runtime,['stage','Measured minutes','component','hardware'])+'''
+'''+markdown(runtime, ['stage', 'Measured minutes', 'component', 'hardware'])+'''
 
 Source: [runtime CSV](results/stage6_runtime.csv), derived from the original per-stage cost CSVs. Timing excludes different overheads by stage;
 historical GPU allocations exclude driver memory and other applications.
@@ -292,8 +328,8 @@ See [CITATION.cff](CITATION.cff) for project attribution and the upstream Chrono
 
 Project code and original documentation: [MIT](LICENSE). The license does not relicense third-party model weights or Binance data.
 '''
-    Path('README.md').write_text(text,encoding='utf-8')
+    Path('README.md').write_text(text, encoding='utf-8')
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

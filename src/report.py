@@ -28,14 +28,43 @@ def headline_rows() -> pd.DataFrame:
     return rows
 
 
-def headline_table() -> str:
-    """Generate the single headline table directly from frozen raw-QLIKE CSV values."""
+def stage7_headline_table() -> str:
+    """Generate the Stage 7 headline table with standard Patton QLIKE, CIs, DM tests, and costs."""
+    df = pd.read_csv(RESULTS / 'stage7_headline.csv')
+    lines = [
+        '| Group | h | Model | log RMSE | MAE | Raw Patton QLIKE [95% CI] | Cal Patton QLIKE [95% CI] | DM p vs Weekday | Params | Train Time |',
+        '| --- | ---: | --- | ---: | ---: | --- | --- | ---: | ---: | ---: |'
+    ]
+    for row in df.itertuples():
+        p_str = '—' if row.model == 'HAR-weekday' else ('<0.0001' if row.dm_pvalue_vs_weekday < 0.0001 else f'{row.dm_pvalue_vs_weekday:.4f}')
+        if row.trainable_parameters >= 1e6:
+            p_count = f'{row.trainable_parameters / 1e6:.1f}M'
+        elif row.trainable_parameters >= 1e3:
+            p_count = f'{row.trainable_parameters / 1e3:.1f}K'
+        else:
+            p_count = str(int(row.trainable_parameters))
+        t_time = f'{row.fit_seconds:.2f}s'
+        lines.append(
+            f'| {row.symbol_group} | {row.horizon} | {row.model} | {row.rmse:.4f} | {row.mae:.4f} | '
+            f'{row.qlike_raw:.4f} [{row.qlike_raw_lo:.4f}, {row.qlike_raw_hi:.4f}] | '
+            f'{row.qlike:.4f} [{row.qlike_lo:.4f}, {row.qlike_hi:.4f}] | '
+            f'{p_str} | {p_count} | {t_time} |'
+        )
+    return '\n'.join(lines)
+
+
+def legacy_headline_table() -> str:
+    """Legacy orientation QLIKE table (V_hat/V - log(V_hat/V) - 1). Kept for errata."""
     rows = headline_rows().set_index(['symbol_group','horizon','model'])
     lines = ['| Group | h | ' + ' | '.join(MODELS) + ' |', '| --- | ---: | ' + ' | '.join(['---:']*len(MODELS)) + ' |']
     for group in GROUPS:
         for h in [1,5,22]:
             lines.append(f'| {group} | {h} | ' + ' | '.join(f'{rows.loc[(group,h,m), "qlike_raw"]:.4f}' for m in MODELS) + ' |')
     return '\n'.join(lines)
+
+
+# Primary headline table is Stage 7 standard Patton QLIKE
+headline_table = stage7_headline_table
 
 
 def markdown(frame: pd.DataFrame, columns: list[str]) -> str:

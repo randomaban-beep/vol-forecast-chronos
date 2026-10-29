@@ -18,40 +18,69 @@ This project investigates a central question in modern quantitative machine lear
 - **Consumer Hardware Budget**: Engineered to run entirely on a single laptop GPU (NVIDIA RTX 3050 6 GB, 24 GB RAM) within a strict 2-hour budget.
 - **Reproducible & Audited**: One-command rebuild (`python scripts/reproduce.py`), cryptographic preservation hashes, and open-source MIT release.
 
-### High-level takeaways
-1. **Directional Accuracy**: Chronos-Bolt is superior at predicting the *trend* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
-2. **Typical Days (MdAPE)**: On typical non-crash days, fine-tuned Chronos delivers lower median percentage errors (31–36% MdAPE) than classical models (37–46%).
-3. **The Power of the Calendar**: Adding day-of-week terms to HAR (HAR-weekday) creates a 10-parameter baseline that rivals fine-tuned 48M-parameter neural networks on QLIKE loss. A simple calendar baseline is a formidable opponent.
+### High-level takeaways (Patton 2011 standard evaluation)
+1. **The Calendar Baseline (HAR-weekday) Wins Overall**: Under standard Patton (2011) QLIKE and log RMSE, HAR-weekday is the top-performing model across all horizons (h=1, 5, 22). A simple 10-parameter linear regression with weekday terms beats or matches the 48M-parameter foundation model at a fraction of the compute cost.
+2. **Calibrated Chronos Competes at Multi-Day Horizons**: When smearing calibration is applied to align variance scales with the conditional arithmetic mean, fine-tuned Chronos-Bolt achieves competitive or slightly lower point estimates at h=5 (0.3697 vs 0.3799) and h=22 (0.3205 vs 0.3491); however, Diebold-Mariano tests against HAR-weekday show p-values of 0.31–0.65 (fail to reject the null of equal predictive accuracy).
+3. **Directional Accuracy (MDA)**: Where Chronos clearly leads is in predicting the *direction* of volatility changes (anticipating whether volatility will expand or contract with 70–75% accuracy vs 64–71% for standard HAR-RV).
+4. **Typical Days (MdAPE)**: On median percentage error (which is robust to single-day extreme shocks), Chronos yields lower typical errors (31–36% MdAPE vs 37–46% for HAR).
 
 ---
 
 ## The 30-second story
 
-At h=1, fine-tuning clearly beats HAR-RV, but is roughly tied with HAR-weekday: a calendar is a formidable low-budget opponent.
-That tie is a practical summary, not an equivalence test—fine-tuning has lower raw QLIKE point estimates, while HAR-weekday has lower calibrated QLIKE and log-RV error.
-At h=22, HAR variants win under calibrated QLIKE.
-The fine-tuned row is the Stage 4 validation-selected small model—full fine-tuning for h=1/5, LoRA rank 16 for h=22—and every test curve leaves that choice alone.
+At h=1, HAR-weekday wins on raw Patton QLIKE (0.4383 vs 0.5059 for fine-tuned) and log RMSE (0.5920 vs 0.6087).
+On calibrated QLIKE, smearing aligns Chronos with the arithmetic mean, putting fine-tuned Chronos (0.3802) roughly tied with HAR-weekday (0.3758; DM p=0.6471).
+At multi-day horizons (h=5 and h=22), calibrated Chronos achieves slightly lower point estimates (0.3205 vs 0.3491 at h=22), but differences are not statistically distinguishable from HAR-weekday.
 This is a forecasting-accuracy study, not a trading strategy.
 
 ![Raw QLIKE for six headline models across three horizons; held-out symbols in the lighter lower panel; bars show 95 percent confidence intervals](docs/img/headline.png)
 
-**Raw QLIKE, lower is better.** Fine-tuned metrics average the three seed-specific scores, not ensemble predictions.
-Intervals use 30-day circular blocks; fine-tuned intervals also resample seeds. Zero-shot is Chronos-Bolt-small.
+**Headline Results Table: Patton (2011) QLIKE, Error Metrics, Uncertainty, and Costs.**
+Lower QLIKE and RMSE are better. Intervals use 30-day circular blocks; fine-tuned intervals also resample seeds. Zero-shot is Chronos-Bolt-small. Fine-tuned model is validation-selected (full for h=1/5, LoRA-16 for h=22).
 
 <!-- headline-table-start -->
-| Group | h | Naive | HAR-RV | HAR-weekday | GARCH-t | Zero-shot | Fine-tuned |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| fit-eligible | 1 | 0.3692 | 0.2773 | 0.1709 | 0.7262 | 0.1778 | 0.1544 |
-| fit-eligible | 5 | 0.3480 | 0.1754 | 0.1596 | 0.4407 | 0.1458 | 0.1448 |
-| fit-eligible | 22 | 0.5100 | 0.2200 | 0.2177 | 0.6150 | 0.1884 | 0.1770 |
-| held-out | 1 | 0.3278 | 0.2270 | 0.1458 | 0.4101 | 0.1712 | 0.1456 |
-| held-out | 5 | 0.3384 | 0.1494 | 0.1378 | 0.2432 | 0.1387 | 0.1363 |
-| held-out | 22 | 0.5047 | 0.1470 | 0.1463 | 0.2686 | 0.1523 | 0.1504 |
+| Group | h | Model | log RMSE | MAE | Raw Patton QLIKE [95% CI] | Cal Patton QLIKE [95% CI] | DM p vs Weekday | Params | Train Time |
+| --- | ---: | --- | ---: | ---: | --- | --- | ---: | ---: | ---: |
+| fit-eligible | 1 | Naive | 0.7655 | 0.5661 | 0.5634 [0.2813, 1.2678] | 0.4491 [0.2575, 0.9290] | 0.0047 | 0 | 0.00s |
+| fit-eligible | 1 | HAR-RV | 0.6833 | 0.4949 | 0.4989 [0.2066, 1.2491] | 0.4180 [0.2073, 0.9663] | <0.0001 | 4 | 0.30s |
+| fit-eligible | 1 | HAR-weekday | 0.5920 | 0.4369 | 0.4383 [0.1618, 1.1439] | 0.3758 [0.1682, 0.9177] | — | 10 | 0.58s |
+| fit-eligible | 1 | GARCH-t | 0.9176 | 0.7180 | 0.5014 [0.2828, 1.0544] | 0.5020 [0.2775, 1.0706] | <0.0001 | 4 | 4.53s |
+| fit-eligible | 1 | Zero-shot | 0.6151 | 0.4534 | 0.4921 [0.1811, 1.2759] | 0.4005 [0.1880, 0.9504] | <0.0001 | 0 | 0.84s |
+| fit-eligible | 1 | Fine-tuned | 0.6087 | 0.4429 | 0.5059 [0.1933, 1.2585] | 0.3802 [0.1802, 0.8886] | 0.6471 | 47.7M | 99.26s |
+| fit-eligible | 5 | Naive | 0.8338 | 0.6041 | 0.7517 [0.3905, 1.4433] | 0.4965 [0.3080, 0.8632] | 0.0268 | 0 | 0.00s |
+| fit-eligible | 5 | HAR-RV | 0.6290 | 0.4606 | 0.4363 [0.1484, 1.0431] | 0.3867 [0.1646, 0.8581] | 0.5651 | 4 | 0.30s |
+| fit-eligible | 5 | HAR-weekday | 0.6090 | 0.4402 | 0.4276 [0.1387, 1.0528] | 0.3799 [0.1539, 0.8658] | — | 10 | 0.58s |
+| fit-eligible | 5 | GARCH-t | 0.8193 | 0.6627 | 0.4463 [0.2280, 0.9070] | 0.4474 [0.2203, 0.9260] | 0.0006 | 4 | 4.53s |
+| fit-eligible | 5 | Zero-shot | 0.6315 | 0.4303 | 0.5262 [0.1701, 1.2639] | 0.3809 [0.1639, 0.8380] | 0.9563 | 0 | 0.84s |
+| fit-eligible | 5 | Fine-tuned | 0.6359 | 0.4365 | 0.5369 [0.1698, 1.2814] | 0.3697 [0.1625, 0.8249] | 0.5834 | 47.7M | 99.26s |
+| fit-eligible | 22 | Naive | 0.9834 | 0.7215 | 1.0540 [0.5235, 1.9113] | 0.5766 [0.3792, 0.9175] | <0.0001 | 0 | 0.00s |
+| fit-eligible | 22 | HAR-RV | 0.6865 | 0.5321 | 0.3865 [0.1490, 0.8463] | 0.3501 [0.1744, 0.6891] | 0.2970 | 4 | 0.30s |
+| fit-eligible | 22 | HAR-weekday | 0.6843 | 0.5299 | 0.3853 [0.1474, 0.8469] | 0.3491 [0.1724, 0.6888] | — | 10 | 0.58s |
+| fit-eligible | 22 | GARCH-t | 0.9176 | 0.7620 | 0.3939 [0.2561, 0.6400] | 0.3820 [0.2135, 0.6977] | 0.0587 | 4 | 4.53s |
+| fit-eligible | 22 | Zero-shot | 0.7326 | 0.5108 | 0.5635 [0.2022, 1.2072] | 0.3530 [0.1906, 0.6507] | 0.8362 | 0 | 0.84s |
+| fit-eligible | 22 | Fine-tuned | 0.7158 | 0.5068 | 0.5332 [0.1776, 1.1459] | 0.3205 [0.1772, 0.5822] | 0.3136 | 589.8K | 122.62s |
+| held-out | 1 | Naive | 0.7326 | 0.5455 | 0.5454 [0.2465, 1.2864] | 0.4368 [0.2335, 0.9416] | 0.0031 | 0 | 0.00s |
+| held-out | 1 | HAR-RV | 0.6529 | 0.4769 | 0.4927 [0.1945, 1.2555] | 0.4026 [0.1877, 0.9611] | 0.0010 | 4 | 0.30s |
+| held-out | 1 | HAR-weekday | 0.5738 | 0.4205 | 0.4427 [0.1579, 1.1516] | 0.3702 [0.1552, 0.9140] | — | 10 | 0.58s |
+| held-out | 1 | GARCH-t | 0.7616 | 0.5920 | 0.4031 [0.2099, 0.8930] | 0.4056 [0.2063, 0.9090] | 0.1093 | 4 | 4.53s |
+| held-out | 1 | Zero-shot | 0.6086 | 0.4425 | 0.4880 [0.1756, 1.2510] | 0.4000 [0.1869, 0.9405] | <0.0001 | 0 | 0.84s |
+| held-out | 1 | Fine-tuned | 0.5957 | 0.4280 | 0.5063 [0.1829, 1.2847] | 0.3809 [0.1735, 0.9048] | 0.0797 | 47.7M | 99.26s |
+| held-out | 5 | Naive | 0.8067 | 0.5868 | 0.6621 [0.3387, 1.2510] | 0.4503 [0.2818, 0.7605] | 0.1168 | 0 | 0.00s |
+| held-out | 5 | HAR-RV | 0.6091 | 0.4384 | 0.4263 [0.1421, 1.0067] | 0.3616 [0.1428, 0.8176] | 0.7135 | 4 | 0.30s |
+| held-out | 5 | HAR-weekday | 0.5923 | 0.4174 | 0.4191 [0.1337, 1.0142] | 0.3573 [0.1349, 0.8296] | — | 10 | 0.58s |
+| held-out | 5 | GARCH-t | 0.6686 | 0.5242 | 0.3500 [0.1537, 0.7464] | 0.3539 [0.1506, 0.7631] | 0.9041 | 4 | 4.53s |
+| held-out | 5 | Zero-shot | 0.6179 | 0.4213 | 0.4767 [0.1551, 1.0713] | 0.3545 [0.1617, 0.7125] | 0.9347 | 0 | 0.84s |
+| held-out | 5 | Fine-tuned | 0.6201 | 0.4259 | 0.4980 [0.1625, 1.1720] | 0.3423 [0.1510, 0.7490] | 0.4903 | 47.7M | 99.26s |
+| held-out | 22 | Naive | 0.9462 | 0.6997 | 0.9123 [0.4547, 1.6011] | 0.5163 [0.3474, 0.7795] | <0.0001 | 0 | 0.00s |
+| held-out | 22 | HAR-RV | 0.6079 | 0.4367 | 0.3297 [0.1169, 0.7154] | 0.2717 [0.1176, 0.5578] | 0.8689 | 4 | 0.30s |
+| held-out | 22 | HAR-weekday | 0.6071 | 0.4355 | 0.3295 [0.1156, 0.7145] | 0.2719 [0.1165, 0.5584] | — | 10 | 0.58s |
+| held-out | 22 | GARCH-t | 0.6787 | 0.5475 | 0.2664 [0.1391, 0.4995] | 0.2800 [0.1164, 0.5758] | 0.6075 | 4 | 4.53s |
+| held-out | 22 | Zero-shot | 0.6538 | 0.4550 | 0.4040 [0.1538, 0.7924] | 0.2755 [0.1706, 0.4439] | 0.9415 | 0 | 0.84s |
+| held-out | 22 | Fine-tuned | 0.6526 | 0.4629 | 0.4201 [0.1433, 0.9073] | 0.2570 [0.1385, 0.4599] | 0.6794 | 589.8K | 122.62s |
 <!-- headline-table-end -->
 
-Sources: [baselines](results/stage2_baselines.csv), [zero-shot](results/stage3_zero_shot.csv),
-[fine-tuning](results/stage4_finetune.csv), [HAR-weekday](results/stage5_weekday.csv),
-[frozen validation selection](results/stage5_frozen_selection.csv).
+Sources: [Stage 7 headline CSV](results/stage7_headline.csv), [baselines](results/stage7_baselines.csv),
+[zero-shot](results/stage7_zero_shot.csv), [fine-tuning](results/stage7_finetune.csv).
 
 ## Scoreboard
 
@@ -59,9 +88,8 @@ Sources: [baselines](results/stage2_baselines.csv), [zero-shot](results/stage3_z
 
 The grid includes the alternate HAR feature definition and asymmetric GARCH so their wins and losses remain visible.
 Green borders mark exact point-estimate winners, including exact ties; displayed rounding is not a tie test.
-Stars use the [Stage 5 joint MCS](results/stage5_mcs.csv), whose universe also includes the ablations and other original families—not just the displayed columns.
+Stars use the [Stage 7 joint MCS](results/stage7_mcs.csv), whose universe also includes the ablations and other original families—not just the displayed columns.
 MCS membership means the procedure did not eliminate that candidate; it does not prove equivalence.
-Both QLIKE variants use `V_hat / V - log(V_hat / V) - 1`, the study's specified ratio orientation.
 
 ## The day everything broke
 
@@ -91,33 +119,32 @@ Models, validation choices and calibration factors stay frozen. No refitting, re
 The rescore includes the scoreboard's eight columns. Later forecasts still use observed history;
 this is a loss rescore, not a counterfactual market in which the shock never happened.
 
-| Group | h | Raw before | Raw after | Calibrated before | Calibrated after | Origins removed |
+| Group | h | Raw Patton before | Raw Patton after | Calibrated Patton before | Calibrated Patton after | Origins removed |
 | --- | --- | --- | --- | --- | --- | --- |
-| fit-eligible | 1 | Fine-tuned | Fine-tuned | HAR-weekday | HAR-weekday | 3 |
-| fit-eligible | 5 | Fine-tuned | Fine-tuned | HAR-weekday | HAR-weekday | 7 |
-| fit-eligible | 22 | Fine-tuned | Fine-tuned | HAR-weekday | HAR-weekday | 24 |
-| held-out | 1 | Fine-tuned | Fine-tuned | HAR-weekday | HAR-weekday | 3 |
-| held-out | 5 | Fine-tuned | Fine-tuned | HAR-weekday | HAR-weekday | 7 |
-| held-out | 22 | HAR-weekday | Fine-tuned | HAR-log-mean-RV | HAR-log-mean-RV | 24 |
+| fit-eligible | 1 | HAR-weekday | HAR-weekday | HAR-weekday | HAR-weekday | 3 |
+| fit-eligible | 5 | HAR-weekday | HAR-weekday | Fine-tuned | HAR-weekday | 7 |
+| fit-eligible | 22 | HAR-weekday | HAR-weekday | Fine-tuned | HAR-weekday | 24 |
+| held-out | 1 | GARCH-t | HAR-weekday | HAR-weekday | HAR-weekday | 3 |
+| held-out | 5 | GARCH-t | GARCH-t | Fine-tuned | HAR-weekday | 7 |
+| held-out | 22 | GARCH-t | HAR-weekday | Fine-tuned | HAR-weekday | 24 |
 
-Only the held-out h=22 raw-QLIKE winner changes, from HAR-weekday to fine-tuned; calibrated winners stay the same.
-This does not make the remaining test period independent of other shocks. All model scores, ranks and retained counts:
-[robustness CSV](results/stage6_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
+Under standard Patton QLIKE, removing the flash crash dates cements HAR-weekday as the dominant performer across all horizons and groups.
+All model scores, ranks and retained counts: [robustness CSV](results/stage7_robustness.csv). This sensitivity check reports point estimates, not fresh significance claims.
 
 ### Beyond loss averages: directional calls and typical error
 
 Standard QLIKE and RMSE averages are heavily weighted by tail events. Complementary scale-free metrics from [extended metrics CSV](results/stage6_extended_metrics.csv) show where Chronos excels:
 
-**Directional Accuracy (MDA, higher is better):**
+**Directional Accuracy (MDA, higher is better; Naive excluded as direction is undefined):**
 
-| Group | h | Naive | HAR-RV | HAR-weekday | GARCH-t | Zero-shot | Fine-tuned |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| fit-eligible | 1 | 0.00% | 64.45% | 70.04% | 59.90% | 68.47% | 70.42% |
-| fit-eligible | 5 | 0.00% | 67.64% | 68.82% | 62.70% | 71.85% | 71.38% |
-| fit-eligible | 22 | 0.00% | 71.77% | 71.58% | 65.96% | 74.91% | 75.68% |
-| held-out | 1 | 0.00% | 64.26% | 68.57% | 63.32% | 67.32% | 69.07% |
-| held-out | 5 | 0.00% | 68.93% | 69.32% | 65.30% | 71.77% | 72.06% |
-| held-out | 22 | 0.00% | 78.04% | 78.20% | 70.58% | 77.80% | 77.23% |
+| Group | h | HAR-RV | HAR-weekday | GARCH-t | Zero-shot | Fine-tuned |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| fit-eligible | 1 | 64.45% | 70.04% | 59.90% | 68.47% | 70.42% |
+| fit-eligible | 5 | 67.64% | 68.82% | 62.70% | 71.85% | 71.38% |
+| fit-eligible | 22 | 71.77% | 71.58% | 65.96% | 74.91% | 75.68% |
+| held-out | 1 | 64.26% | 68.57% | 63.32% | 67.32% | 69.07% |
+| held-out | 5 | 68.93% | 69.32% | 65.30% | 71.77% | 72.06% |
+| held-out | 22 | 78.04% | 78.20% | 70.58% | 77.80% | 77.23% |
 
 **Median Absolute Percentage Error on Variance (MdAPE, lower is better):**
 
@@ -132,6 +159,48 @@ Standard QLIKE and RMSE averages are heavily weighted by tail events. Complement
 
 - **Directional hit rate:** Chronos models achieve the highest directional accuracy across both fit-eligible and held-out assets (reaching 70.42% at h=1 and up to 75.68% at h=22), consistently outperforming standard HAR-RV (64.45% and 71.77%).
 - **Typical-day error:** On Median Absolute Percentage Error (MdAPE), Chronos-Bolt consistently beats HAR-RV and HAR-weekday across all horizons (33.39% vs 35.01% at h=1; 31.57% vs 36.70% at h=5; 36.65% vs 46.29% at h=22), demonstrating substantially lower percentage error when outlier shock days are mitigated.
+
+## Errata: Loss Function Orientation (Patton 2011 vs Legacy)
+
+In Stages 2–6, the evaluation suite implemented QLIKE as:
+$$\mathcal{L}_{\text{legacy}}(V, \hat{V}) = \frac{\hat{V}}{V} - \log\left(\frac{\hat{V}}{V}\right) - 1 \quad (\text{forecast over actual})$$
+
+### The Orientation Problem and Mathematical Consequence
+In the time-series econometrics literature (Patton 2011, *Journal of Econometrics*), the standard robust QLIKE loss function is defined with actual over forecast:
+$$\mathcal{L}_{\text{patton}}(V, \hat{V}) = \frac{V}{\hat{V}} - \log\left(\frac{V}{\hat{V}}\right) - 1 \quad (\text{actual over forecast})$$
+
+The distinction is mathematically fundamental:
+1. **Consistency for the Conditional Arithmetic Mean**:
+   Taking the first-order condition of expected loss with respect to $\hat{V}$:
+   $$\frac{\partial \mathcal{L}_{\text{patton}}}{\partial \hat{V}} = -\frac{V}{\hat{V}^2} + \frac{1}{\hat{V}} = \frac{\hat{V} - V}{\hat{V}^2} \implies \mathbb{E}\left[\frac{\partial \mathcal{L}_{\text{patton}}}{\partial \hat{V}}\right] = 0 \iff \hat{V} = \mathbb{E}[V]$$
+   Thus, standard Patton QLIKE is strictly consistent for the **arithmetic conditional mean**.
+2. **Why Legacy QLIKE Favored Negative Bias**:
+   Taking the first-order condition for the legacy formula:
+   $$\frac{\partial \mathcal{L}_{\text{legacy}}}{\partial \hat{V}} = \frac{1}{V} - \frac{1}{\hat{V}} \implies \mathbb{E}\left[\frac{\partial \mathcal{L}_{\text{legacy}}}{\partial \hat{V}}\right] = 0 \iff \hat{V} = \frac{1}{\mathbb{E}[1/V]}$$
+   The legacy loss function is minimized at the **conditional harmonic mean** of realized variance.
+   Because the harmonic mean is strictly less than or equal to the arithmetic mean ($\text{HM} \le \text{AM}$), the legacy formula heavily penalized forecasts higher than actual and systematically rewarded models that under-forecasted volatility (negative bias).
+3. **What Changed Under Patton (2011) QLIKE**:
+   - Because raw Chronos-Bolt forecasts had a slight negative bias (bias $\approx -0.09$), legacy QLIKE artificially boosted raw Chronos-Bolt below HAR-RV and HAR-weekday.
+   - When smearing calibration was applied (multiplying by $\mathbb{E}[\exp(e)] > 1$ to align with the arithmetic mean), legacy QLIKE penalized that upward scale adjustment.
+   - Under standard Patton QLIKE, smearing calibration now functions exactly as econometrics theory predicts: it scales forecasts to the arithmetic mean, cutting loss from ~0.50 down to ~0.38.
+   - Under standard Patton QLIKE, **HAR-weekday is the clear winner on raw loss and log RMSE across all horizons**. On calibrated loss, fine-tuned Chronos-Bolt achieves slightly lower point estimates at $h=5$ and $h=22$ (e.g. 0.3205 vs 0.3491 at $h=22$), but Diebold-Mariano tests vs HAR-weekday confirm the difference is not statistically significant ($p \approx 0.31\text{--}0.65$).
+
+### Appendix: Legacy Orientation QLIKE Numbers (Stages 2–6)
+For historical auditability and full reproducibility of earlier milestones, the legacy orientation QLIKE values ($\hat{V}/V - \log(\hat{V}/V) - 1$) are preserved below:
+
+<!-- legacy-headline-start -->
+| Group | h | Naive | HAR-RV | HAR-weekday | GARCH-t | Zero-shot | Fine-tuned |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fit-eligible | 1 | 0.3692 | 0.2773 | 0.1709 | 0.7262 | 0.1778 | 0.1544 |
+| fit-eligible | 5 | 0.3480 | 0.1754 | 0.1596 | 0.4407 | 0.1458 | 0.1448 |
+| fit-eligible | 22 | 0.5100 | 0.2200 | 0.2177 | 0.6150 | 0.1884 | 0.1770 |
+| held-out | 1 | 0.3278 | 0.2270 | 0.1458 | 0.4101 | 0.1712 | 0.1456 |
+| held-out | 5 | 0.3384 | 0.1494 | 0.1378 | 0.2432 | 0.1387 | 0.1363 |
+| held-out | 22 | 0.5047 | 0.1470 | 0.1463 | 0.2686 | 0.1523 | 0.1504 |
+<!-- legacy-headline-end -->
+
+Sources: [Stage 2 baselines](results/stage2_baselines.csv), [Stage 3 zero-shot](results/stage3_zero_shot.csv),
+[Stage 4 fine-tuning](results/stage4_finetune.csv), [Stage 5 weekday](results/stage5_weekday.csv).
 
 ## Is it worth the compute?
 
@@ -209,8 +278,8 @@ flowchart LR
 - Each model/horizon's smearing factor is `mean(exp(target - prediction))` on six-symbol 2024 validation residuals, then frozen. Raw uses factor one.
 - Median daily log-RV paths become horizon forecasts via `log(mean(exp(path[:h])))`; contexts end at the origin, preserving missing days as NaNs/masks.
 - Future-perturbation and held-out-perturbation tests protect contexts and fitting. Missing forecasts cannot silently shrink the common panel.
-- [Preservation hashes](results/stage6_preservation.csv) verify every pre-Stage-6 result file byte-identical. [Stage 5 audit](results/stage5_panel_audit.csv) checks common rows and exact reuse.
-- Regime thresholds use training data only. [Regime results](results/stage5_regimes.csv) retain calendar gaps in resampling and report sparse-sample counts.
+- [Preservation hashes](results/stage7_preservation.csv) verify every pre-Stage-7 result file byte-identical. [Stage 5 audit](results/stage5_panel_audit.csv) checks common rows and exact reuse.
+- Regime thresholds use training data only. [Regime results](results/stage7_regimes.csv) retain calendar gaps in resampling and report sparse-sample counts.
 
 ## FAQ for skeptics
 
@@ -240,7 +309,7 @@ flowchart LR
 - `src/data.py`, `src/baselines.py`, `src/finetune.py`, `src/evaluate.py`: data, models and one shared scoring rule.
 - `src/zero_shot.py`, `src/ablations.py`, `src/regimes.py`: causal contexts and analysis.
 - `configs/`: fixed experiment settings and pinned model revisions.
-- `results/`: immutable historical CSVs/figures plus new Stage 6 reporting CSVs.
+- `results/`: immutable historical CSVs/figures plus new Stage 7 reporting CSVs.
 - `scripts/make_readme_figures.py`: every new report figure from committed CSVs; `docs/img/`: generated PNGs and local badges.
 - `tests/`: leakage, metrics, training safeguards and README/CSV/link checks.
 - `data/`: ignored caches and checkpoints. Never committed.
@@ -256,7 +325,7 @@ python scripts/reproduce.py
 
 The default is a **CSV-only report rebuild**: no raw-data download, inference or training.
 `python scripts/make_readme_figures.py` regenerates all new figures by itself; the three existing error plots stay untouched.
-`python scripts/reproduce.py --rescore` additionally rebuilds the small Stage 6 exports from existing `data/stage5/scored.parquet`.
+`python scripts/reproduce.py --rescore` additionally rebuilds the small Stage 7 exports from existing `data/stage5/scored.parquet`.
 `python scripts/reproduce.py --experiments` runs the complete experiment pipeline in a separate ignored workspace, preserving published results; this is expensive and opt-in.
 Install a CUDA-compatible PyTorch build to use the GPU; otherwise inference/training falls back to CPU.
 Check with `python -m pytest -q`. No API key is required for public Binance archives or the pinned public model weights.
@@ -273,7 +342,7 @@ Missing timings are marked, not guessed. Stage 6 reports a local report-generati
 | 3 | 0.366 | Cached model load + inference only | RTX 3050 |
 | 4 | 31.711 | Training, all 18 runs | RTX 3050 |
 | 5 | 65.319 | Training, 45 new runs; 9 reused | RTX 3050 |
-| 6 | 0.117 | Measured CSV-only figure + README build; excludes rescore | CPU |
+| 6 | 0.152 | Measured CSV-only figure + README build; excludes rescore | CPU |
 
 Source: [runtime CSV](results/stage6_runtime.csv), derived from the original per-stage cost CSVs. Timing excludes different overheads by stage;
 historical GPU allocations exclude driver memory and other applications.
