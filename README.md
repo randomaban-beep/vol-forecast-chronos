@@ -267,3 +267,129 @@ Means below are across seeds; lower is better. QLIKE C denotes the frozen valida
 | Chronos-Bolt-tiny-full | held-out | 22 | 0.6682 | 0.4716 | 0.1546 | 0.2845 |
 | Chronos-Bolt-tiny-lora16 | held-out | 22 | 0.6692 | 0.4710 | 0.1538 | 0.2770 |
 | Chronos-Bolt-tiny-lora8 | held-out | 22 | 0.6758 | 0.4772 | 0.1564 | 0.2831 |
+
+## Stage 5: calendar baseline, ablations and analysis
+
+Reproduce from the frozen Stage 4 caches with `python scripts/reproduce_stage5.py`.
+Install plotting support with `pip install -e ".[analysis]"`. Training caches, predictions
+and checkpoints remain under ignored `data/`; only new Stage 5 result files are added.
+The runner resumes fingerprint-matched completed runs and reuses identical Stage 4 runs.
+
+HAR-weekday adds six weekday dummies (Monday reference) to the existing pooled HAR-RV
+on daily/weekly/monthly mean log RV. The h=1 weekday is origin + one day; h=5 and h=22
+use the origin weekday. All are calendar-known at the origin. The same six-symbol
+expanding fit, 30-day refit dates, targets and common forecast panel are retained.
+
+| symbol_group | horizon | rmse | mae | qlike_raw | qlike |
+| --- | --- | --- | --- | --- | --- |
+| fit-eligible | 1 | 0.5920 | 0.4369 | 0.1709 | 0.2666 |
+| fit-eligible | 5 | 0.6090 | 0.4402 | 0.1596 | 0.2375 |
+| fit-eligible | 22 | 0.6843 | 0.5299 | 0.2177 | 0.3226 |
+| held-out | 1 | 0.5738 | 0.4205 | 0.1458 | 0.2225 |
+| held-out | 5 | 0.5923 | 0.4174 | 0.1378 | 0.1912 |
+| held-out | 22 | 0.6071 | 0.4355 | 0.1463 | 0.1922 |
+
+HAR-weekday improves both raw and calibrated QLIKE over original HAR-RV at every
+horizon in both groups. It narrows the fine-tuned model's apparent advantage:
+the frozen small full model still has a lower next-day raw QLIKE point estimate
+(almost tied on held-out symbols), but HAR-weekday
+has lower next-day calibrated QLIKE in both groups. These are metric-dependent gains.
+
+The one-factor small-model grid uses full fine-tuning and LoRA rank 16 for contexts
+32/64/128/256 and earliest training-window fractions 10/25/50/100%; the rank sweep
+uses 4/8/16/32 with context 256 and all training windows. Three seeds are used everywhere.
+Context comparisons retain the same 256-history target-window membership and slice
+the trailing context, isolating context length from sample size. Fractions select
+floor(fraction × N) windows ordered by origin then symbol; selected samples retain
+the original training order. No validation/test/held-out windows enter training.
+NaN contexts are retained and masked by Chronos, with no interpolation.
+
+Test curves are reporting only. Before ablation scoring, original Stage 4 families
+were compared by mean seed validation RMSE on the six fit-eligible symbols; these
+choices are frozen and are not replaced by test winners:
+
+| horizon | family | validation_rmse |
+| --- | --- | --- |
+| 1 | Chronos-Bolt-small-full | 0.6400 |
+| 5 | Chronos-Bolt-small-full | 0.6542 |
+| 22 | Chronos-Bolt-small-lora16 | 0.7047 |
+
+![Context raw QLIKE](results/stage5_context_qlike_raw.png)
+![Training fraction raw QLIKE](results/stage5_fraction_qlike_raw.png)
+![Rank raw QLIKE](results/stage5_rank_qlike_raw.png)
+![Rank parameter counts](results/stage5_rank_parameters.png)
+
+Calibrated counterparts are saved as `results/stage5_{context,fraction,rank}_qlike.png`.
+The 32-day context worsens next-day raw QLIKE relative to 256 for both training
+modes and both symbol groups. The rank sweep shows little separation in raw QLIKE
+despite an eightfold increase in adapter parameters from rank 4 to rank 32.
+Longer-horizon and calibrated curves are not uniformly monotone; none of these
+test curves changes the validation-frozen headline configuration.
+The full [ablation table](results/stage5_ablation_summary.csv) includes both QLIKE
+variants, RMSE/MAE, 95% seed/date block-bootstrap CIs, costs, and HAC/Harvey DM tests
+against HAR-RV and HAR-weekday. Metrics average seed-specific losses, not ensemble
+predictions. The unchanged shared evaluator applies raw exp(mu) and calibrated
+smearing × exp(mu); each smearing factor is fitted only to six-symbol 2024 validation
+residuals and frozen. SOL and DOGE never calibrate or choose models. Joint 95% MCS
+results include prior model families plus the new experiments; identical reused
+loss columns share membership. These multiple comparisons are descriptive and do
+not authorize test-based selection.
+
+Regimes use each symbol/horizon's training-only 90th percentile of sqrt(mean RV)
+(equivalently a volatility threshold) and classify each test target above it or in
+the rest. Held-out histories define only their retrospective regime thresholds.
+The [regime table](results/stage5_regimes.csv) compares HAR, HAR-weekday and the frozen
+fine-tuned family. Conditional CIs resample whole calendar blocks and divide sampled
+loss totals by sampled observation counts. Bootstrap replications with no qualifying
+observations are excluded, with the
+number of usable replications recorded. CIs condition on a nonempty resample.
+Empty regime dates remain zero-padded
+for calendar-aware DM/HAC and MCS; the common count normalization preserves conditional
+mean loss differences. Regime MCS uses just these three families. Thresholds and
+sample counts are saved separately; future targets never set thresholds.
+The training-decile threshold does not force 10% of test observations into the high
+regime: these test subsets contain only 17–201 symbol/origin examples per group and
+horizon, with overlapping targets and clustered events. Conditional inference is
+therefore especially uncertain. Raw and calibrated rankings can disagree.
+
+The three worst h=1 cases are ranked by mean seed squared log error across all symbols.
+Plots show mean log forecasts and the range across seeds for illustration; headline
+metrics remain means of seed-specific scores.
+
+All three cases coincide with the same market event. Binance reported a broad sell-off and extreme volatility on 2025-10-10 between 20:50 and 22:00 UTC ([exchange statement, published October 12](https://www.binance.com/en/support/announcement/detail/d9cb0d52d7c142a5be4f49732bd8760c)). This retrospective context is consistent with a common shock absent from the log-RV-only inputs; it does not establish each coin's causal mechanism.
+
+1. **ADAUSDT, 2025-10-10**: daily RV was 0.553986, 546.13 times the previous day. The mean log forecast implied RV 0.00100912 and underpredicted realized variance by a factor of 548.98. The abrupt change from the observed history explains the large one-day error; the model had no future price or news inputs. Daily RV alone cannot identify the cause of the move. Mean seed squared log error: 39.792.
+
+2. **DOGEUSDT, 2025-10-10**: daily RV was 0.433164, 315.66 times the previous day. The mean log forecast implied RV 0.00125983 and underpredicted realized variance by a factor of 343.83. The abrupt change from the observed history explains the large one-day error; the model had no future price or news inputs. Daily RV alone cannot identify the cause of the move. Mean seed squared log error: 34.109.
+
+3. **XRPUSDT, 2025-10-10**: daily RV was 0.101461, 183.84 times the previous day. The mean log forecast implied RV 0.000534365 and underpredicted realized variance by a factor of 189.87. The abrupt change from the observed history explains the large one-day error; the model had no future price or news inputs. Daily RV alone cannot identify the cause of the move. Mean seed squared log error: 27.525.
+
+
+![Worst forecast 1](results/stage5_worst_1.png)
+![Worst forecast 2](results/stage5_worst_2.png)
+![Worst forecast 3](results/stage5_worst_3.png)
+
+The **extended-budget tiny LoRA rank 16** experiment is separate. Both tiny LoRA
+families had at least one Stage 4 seed select epoch 3; rank 16 had the lower mean
+validation loss (12.1193 vs 12.1517 for rank 8). It restarts from the same pretrained
+weights/seeds with the same validation-only early stopping and an eight-epoch cap.
+No small-model run is extended, and no Stage 4 number or frozen headline is replaced.
+
+| seed | best_epoch | epochs_completed | best_validation_loss |
+| --- | --- | --- | --- |
+| 42 | 1 | 2 | 12.2252 |
+| 43 | 3 | 4 | 12.0535 |
+| 44 | 2 | 3 | 12.0792 |
+
+No extended seed selected the final eight-epoch cap. Shared-epoch validation losses differ from the original runs by at most 6.845078e-05; the best epochs are unchanged. Cached training/validation tensor values are exactly equal to Stage 4, but their memory layout differs. The retraining is not bit-identical. This is separate from the nine reused prediction sets, which are exactly identical.
+
+| symbol_group | horizon | rmse | mae | qlike_raw | qlike |
+| --- | --- | --- | --- | --- | --- |
+| fit-eligible | 1 | 0.6495 | 0.4770 | 0.1916 | 0.3896 |
+| fit-eligible | 5 | 0.6410 | 0.4341 | 0.1427 | 0.2761 |
+| fit-eligible | 22 | 0.7306 | 0.5153 | 0.1804 | 0.3301 |
+| held-out | 1 | 0.6341 | 0.4631 | 0.1769 | 0.3595 |
+| held-out | 5 | 0.6266 | 0.4240 | 0.1353 | 0.2533 |
+| held-out | 22 | 0.6692 | 0.4710 | 0.1538 | 0.2770 |
+
+New training used 65.3 minutes across 45 runs; 9 runs reused Stage 4. Peak training allocation was 981 MiB on cuda. Per-run costs, best epochs, inference times and raw histories are in the Stage 5 CSVs. 10 new small-model ablation runs selected the three-epoch cap; these fixed-budget curves do not establish convergence. Only the approved Stage 4 tiny family was extended. All 19 historical result files were verified byte-identical by SHA-256. Full reproduction from raw data also requires the earlier-stage commands and their runtime.

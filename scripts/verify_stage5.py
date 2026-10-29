@@ -44,6 +44,8 @@ def main() -> None:
     assert len(costs) == costs.model.nunique() == 54 and costs.extended_budget.sum() == 3
     weekday = pd.read_parquet(root / 'weekday_predictions.parquet')
     pd.testing.assert_frame_equal(weekday[template.columns], template)
+    audit.append(dict(model='HAR-weekday', rows=len(weekday), common_panel_identical=True,
+                      reused_prediction_identical=None))
     pd.DataFrame(audit).to_csv(results / 'stage5_panel_audit.csv', index=False)
     counts = template.assign(symbol_group=np.where(template.symbol.isin(['SOLUSDT', 'DOGEUSDT']),
         'held-out', 'fit-eligible')).groupby(['split', 'horizon', 'symbol_group']).size().rename('examples_per_model')

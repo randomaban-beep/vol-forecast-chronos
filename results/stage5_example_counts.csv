@@ -1,0 +1,13 @@
+split,horizon,symbol_group,examples_per_model
+test,1,fit-eligible,3828
+test,1,held-out,1276
+test,5,fit-eligible,3804
+test,5,held-out,1268
+test,22,fit-eligible,3702
+test,22,held-out,1234
+validation,1,fit-eligible,2196
+validation,1,held-out,732
+validation,5,fit-eligible,2172
+validation,5,held-out,724
+validation,22,fit-eligible,2070
+validation,22,held-out,690

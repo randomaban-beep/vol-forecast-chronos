@@ -1,0 +1,2 @@
+model,trainable_parameters,fit_seconds,inference_ms_per_1000,gpu_memory_mb
+HAR-weekday,10,0.5797012997791121,6.8377067973347705,0
