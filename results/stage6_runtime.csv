@@ -1,0 +1,7 @@
+stage,seconds,component,hardware
+1,,Not instrumented; download depends on network/cache,CPU / network
+2,11.959973999881186,Recorded fitting + inference only,CPU
+3,21.9854151000618,Cached model load + inference only,RTX 3050
+4,1902.677451800089,"Training, all 18 runs",RTX 3050
+5,3919.120546800201,"Training, 45 new runs; 9 reused",RTX 3050
+6,7.008713100047316,Measured CSV-only figure + README build; excludes rescore,CPU

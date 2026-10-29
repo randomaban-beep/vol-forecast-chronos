@@ -6,7 +6,9 @@ import pytest
 from scipy.stats import t
 
 from src.evaluate import (rmse, mae, qlike, smearing_factor, score_forecasts,
-                          diebold_mariano, block_bootstrap_ci, evaluate_panel)
+                          diebold_mariano, block_bootstrap_ci, evaluate_panel,
+                          forecast_bias, mean_directional_accuracy, mdape,
+                          pinball_loss, mincer_zarnowitz)
 
 
 def test_rmse_known() -> None:
@@ -15,6 +17,42 @@ def test_rmse_known() -> None:
 
 def test_mae_known() -> None:
     assert mae(np.array([0, 0]), np.array([-3, 4])) == 3.5
+
+
+def test_forecast_bias_known() -> None:
+    actual = np.array([1.0, 2.0])
+    forecast = np.array([2.0, 4.0])
+    assert forecast_bias(actual, forecast) == pytest.approx(1.5)
+
+
+def test_mean_directional_accuracy_known() -> None:
+    actual_change = np.array([1.0, -2.0, 0.5, -0.5])
+    forecast_change = np.array([2.0, -1.0, -0.1, -1.0])
+    # signs: act: [+, -, +, -], fcast: [+, -, -, -] -> 3 out of 4 match
+    assert mean_directional_accuracy(actual_change, forecast_change) == pytest.approx(0.75)
+
+
+def test_mdape_known() -> None:
+    actual_variance = np.array([1.0, 2.0, 4.0])
+    forecast_variance = np.array([1.2, 1.8, 3.0])
+    # rel errors: [0.20, 0.10, 0.25], median is 0.20
+    assert mdape(actual_variance, forecast_variance) == pytest.approx(0.20)
+
+
+def test_pinball_loss_known() -> None:
+    actual = np.array([2.0, 1.0])
+    forecast = np.array([1.0, 2.0])
+    # e = [1.0, -1.0]. For tau=0.9: 0.9 * 1.0 = 0.9, -0.1 * -1.0 = 0.1. Mean = 0.5
+    assert pinball_loss(actual, forecast, quantile=0.90) == pytest.approx(0.5)
+
+
+def test_mincer_zarnowitz_known() -> None:
+    forecast = np.array([1.0, 2.0, 3.0, 4.0])
+    actual = 2.0 * forecast + 1.0
+    res = mincer_zarnowitz(actual, forecast)
+    assert res["alpha"] == pytest.approx(1.0)
+    assert res["beta"] == pytest.approx(2.0)
+    assert res["r2_mz"] == pytest.approx(1.0)
 
 
 def test_qlike_known_orientation() -> None:
@@ -68,6 +106,15 @@ def test_block_bootstrap_reproducible() -> None:
 def test_invalid_variance_rejected(bad: float) -> None:
     with pytest.raises(ValueError):
         qlike(np.array([1]), np.array([bad]))
+    with pytest.raises(ValueError):
+        mdape(np.array([1]), np.array([bad]))
+
+
+def test_invalid_quantile_rejected() -> None:
+    with pytest.raises(ValueError):
+        pinball_loss(np.array([1.0]), np.array([1.0]), quantile=0.0)
+    with pytest.raises(ValueError):
+        pinball_loss(np.array([1.0]), np.array([1.0]), quantile=1.0)
 
 
 def test_invalid_metric_shapes_rejected() -> None:

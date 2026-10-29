@@ -27,6 +27,58 @@ def mae(actual: np.ndarray, forecast: np.ndarray) -> float:
     return float(np.mean(np.abs(actual - forecast)))
 
 
+def forecast_bias(actual: np.ndarray, forecast: np.ndarray) -> float:
+    """Mean error (forecast - actual) on the supplied scale; positive means over-prediction."""
+    actual, forecast = _pair(actual, forecast)
+    return float(np.mean(forecast - actual))
+
+
+def mean_directional_accuracy(actual_change: np.ndarray, forecast_change: np.ndarray) -> float:
+    """Proportion of signs matching between actual and forecasted changes from origin."""
+    actual, forecast = _pair(actual_change, forecast_change)
+    return float(np.mean(np.sign(actual) == np.sign(forecast)))
+
+
+def mdape(actual_variance: np.ndarray, forecast_variance: np.ndarray) -> float:
+    """Median absolute percentage error on the natural variance scale."""
+    actual, forecast = _pair(actual_variance, forecast_variance)
+    if (actual <= 0).any() or (forecast <= 0).any():
+        raise ValueError("Variances must be positive for MdAPE")
+    return float(np.median(np.abs(forecast - actual) / actual))
+
+
+def pinball_loss(actual: np.ndarray, forecast: np.ndarray, quantile: float = 0.90) -> float:
+    """Quantile / check loss: penalizes under-forecasting risk by weight tau."""
+    actual, forecast = _pair(actual, forecast)
+    if not (0.0 < quantile < 1.0):
+        raise ValueError("Quantile tau must be strictly between 0 and 1")
+    error = actual - forecast
+    return float(np.mean(np.maximum(quantile * error, (quantile - 1.0) * error)))
+
+
+def mincer_zarnowitz(actual: np.ndarray, forecast: np.ndarray) -> dict[str, float]:
+    """Mincer-Zarnowitz OLS regression (actual = alpha + beta * forecast) and R2 metrics."""
+    actual, forecast = _pair(actual, forecast)
+    ss_tot = float(np.sum((actual - actual.mean()) ** 2))
+    if ss_tot <= 1e-15:
+        raise ValueError("Actual has zero variance; cannot compute MZ R2")
+    ss_res_direct = float(np.sum((actual - forecast) ** 2))
+    r2_direct = 1.0 - (ss_res_direct / ss_tot)
+    cov_matrix = np.cov(forecast, actual, ddof=0)
+    var_forecast = cov_matrix[0, 0]
+    if var_forecast <= 1e-15:
+        beta = 0.0
+        alpha = float(actual.mean())
+        r2_mz = 0.0
+    else:
+        beta = float(cov_matrix[0, 1] / var_forecast)
+        alpha = float(actual.mean() - beta * forecast.mean())
+        fitted = alpha + beta * forecast
+        ss_res_mz = float(np.sum((actual - fitted) ** 2))
+        r2_mz = max(0.0, 1.0 - (ss_res_mz / ss_tot))
+    return {"alpha": alpha, "beta": beta, "r2_mz": r2_mz, "r2_direct": r2_direct}
+
+
 def qlike(actual_variance: np.ndarray, forecast_variance: np.ndarray) -> np.ndarray:
     """Point losses: forecast/actual - log(forecast/actual) - 1 (spec orientation)."""
     actual, forecast = _pair(actual_variance, forecast_variance)
