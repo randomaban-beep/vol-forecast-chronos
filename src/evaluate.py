@@ -79,14 +79,35 @@ def mincer_zarnowitz(actual: np.ndarray, forecast: np.ndarray) -> dict[str, floa
     return {"alpha": alpha, "beta": beta, "r2_mz": r2_mz, "r2_direct": r2_direct}
 
 
-def qlike(actual_variance: np.ndarray, forecast_variance: np.ndarray) -> np.ndarray:
-    """Point losses: forecast/actual - log(forecast/actual) - 1 (spec orientation)."""
+def qlike_legacy(actual_variance: np.ndarray, forecast_variance: np.ndarray) -> np.ndarray:
+    """Legacy point losses: forecast/actual - log(forecast/actual) - 1.
+
+    WARNING: Targets the harmonic mean and penalizes high forecasts;
+    favors negative bias. Preserved for continuity and errata.
+    """
     actual, forecast = _pair(actual_variance, forecast_variance)
     if (actual <= 0).any() or (forecast <= 0).any():
         raise ValueError("QLIKE variances must be positive")
     log_ratio = np.log(forecast) - np.log(actual)
     with np.errstate(over="raise", invalid="raise"):
         return np.expm1(log_ratio) - log_ratio
+
+
+def qlike_patton(actual_variance: np.ndarray, forecast_variance: np.ndarray) -> np.ndarray:
+    """Standard Patton (2011) QLIKE point losses: actual/forecast - log(actual/forecast) - 1.
+
+    Consistent for the conditional arithmetic mean.
+    """
+    actual, forecast = _pair(actual_variance, forecast_variance)
+    if (actual <= 0).any() or (forecast <= 0).any():
+        raise ValueError("QLIKE variances must be positive")
+    log_ratio = np.log(actual) - np.log(forecast)
+    with np.errstate(over="raise", invalid="raise"):
+        return np.expm1(log_ratio) - log_ratio
+
+
+# Standard Patton (2011) QLIKE is the primary evaluator metric
+qlike = qlike_patton
 
 
 def smearing_factor(actual_log: np.ndarray, forecast_log: np.ndarray) -> float:
@@ -106,8 +127,10 @@ def score_forecasts(actual_log: np.ndarray, forecast_log: np.ndarray,
         predicted_variance = np.exp(forecast) * smearing
     return pd.DataFrame({"squared_error": (forecast - actual) ** 2,
                          "absolute_error": np.abs(forecast - actual),
-                         "qlike": qlike(actual_variance, predicted_variance),
-                         "qlike_raw": qlike(actual_variance, np.exp(forecast)),
+                         "qlike": qlike_patton(actual_variance, predicted_variance),
+                         "qlike_raw": qlike_patton(actual_variance, np.exp(forecast)),
+                         "qlike_legacy": qlike_legacy(actual_variance, predicted_variance),
+                         "qlike_raw_legacy": qlike_legacy(actual_variance, np.exp(forecast)),
                          "forecast_variance": predicted_variance})
 
 
@@ -219,6 +242,11 @@ def evaluate_panel(predictions: pd.DataFrame, config: dict
                       **diebold_mariano(qloss[model].to_numpy(), qloss["HAR-RV"].to_numpy(), int(h))}
             record.update({key + "_raw": value for key, value in diebold_mariano(
                 raw_loss[model].to_numpy(), raw_loss["HAR-RV"].to_numpy(), int(h)).items()})
+            if "HAR-weekday" in qloss.columns:
+                record.update({f"{k}_vs_weekday": v for k, v in diebold_mariano(
+                    qloss[model].to_numpy(), qloss["HAR-weekday"].to_numpy(), int(h)).items()})
+                record.update({f"{k}_vs_weekday_raw": v for k, v in diebold_mariano(
+                    raw_loss[model].to_numpy(), raw_loss["HAR-weekday"].to_numpy(), int(h)).items()})
             for i, metric in enumerate(["rmse", "mae", "qlike", "qlike_raw"]):
                 record.update({metric: means[i], metric + "_lo": ci[0, i], metric + "_hi": ci[1, i]})
             for name in ["calibrated", "raw"]:

@@ -3,9 +3,11 @@
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.optimize import minimize_scalar
 from scipy.stats import t
 
-from src.evaluate import (rmse, mae, qlike, smearing_factor, score_forecasts,
+from src.evaluate import (rmse, mae, qlike, qlike_patton, qlike_legacy,
+                          smearing_factor, score_forecasts,
                           diebold_mariano, block_bootstrap_ci, evaluate_panel,
                           forecast_bias, mean_directional_accuracy, mdape,
                           pinball_loss, mincer_zarnowitz)
@@ -55,9 +57,34 @@ def test_mincer_zarnowitz_known() -> None:
     assert res["r2_mz"] == pytest.approx(1.0)
 
 
-def test_qlike_known_orientation() -> None:
+def test_qlike_standard_known_orientation() -> None:
+    # Patton (2011): actual/forecast - log(actual/forecast) - 1
+    np.testing.assert_allclose(qlike_patton(np.array([1, 2, 4]), np.array([1, 4, 2])),
+                               [0, -0.5 + np.log(2), 1 - np.log(2)])
     np.testing.assert_allclose(qlike(np.array([1, 2, 4]), np.array([1, 4, 2])),
+                               [0, -0.5 + np.log(2), 1 - np.log(2)])
+
+
+def test_qlike_legacy_known_orientation() -> None:
+    # Legacy: forecast/actual - log(forecast/actual) - 1
+    np.testing.assert_allclose(qlike_legacy(np.array([1, 2, 4]), np.array([1, 4, 2])),
                                [0, 1 - np.log(2), -0.5 + np.log(2)])
+
+
+def test_qlike_standard_minimized_at_arithmetic_mean() -> None:
+    v = np.array([1.0, 2.0, 5.0, 10.0])
+    mean_val = float(np.mean(v))
+    res = minimize_scalar(lambda x: float(np.mean(qlike_patton(v, np.full_like(v, x)))),
+                          bounds=(0.1, 20.0), method="bounded")
+    assert res.x == pytest.approx(mean_val, rel=1e-5)
+
+
+def test_qlike_legacy_minimized_at_harmonic_mean() -> None:
+    v = np.array([1.0, 2.0, 5.0, 10.0])
+    harm_val = float(len(v) / np.sum(1.0 / v))
+    res = minimize_scalar(lambda x: float(np.mean(qlike_legacy(v, np.full_like(v, x)))),
+                          bounds=(0.1, 20.0), method="bounded")
+    assert res.x == pytest.approx(harm_val, rel=1e-5)
 
 
 def test_smearing_and_shared_scoring() -> None:
@@ -106,6 +133,8 @@ def test_block_bootstrap_reproducible() -> None:
 def test_invalid_variance_rejected(bad: float) -> None:
     with pytest.raises(ValueError):
         qlike(np.array([1]), np.array([bad]))
+    with pytest.raises(ValueError):
+        qlike_legacy(np.array([1]), np.array([bad]))
     with pytest.raises(ValueError):
         mdape(np.array([1]), np.array([bad]))
 
