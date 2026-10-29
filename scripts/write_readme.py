@@ -74,8 +74,8 @@ This project investigates a central question in modern quantitative machine lear
 - **Reproducible & Audited**: One-command rebuild (`python scripts/reproduce.py`), cryptographic preservation hashes, and open-source MIT release.
 
 ### High-level takeaways (Patton 2011 standard evaluation)
-1. **The Calendar Baseline (HAR-weekday) Wins on RMSE & Raw QLIKE**: HAR-weekday achieves the lowest log RMSE across all 6 horizon/group combinations and lowest raw Patton QLIKE on all fit-eligible horizons. On MAE, HAR-weekday wins on all held-out horizons and fit-eligible h=1 (0.4369), but Chronos models achieve lower MAE on fit-eligible h=5 (Zero-shot 0.4303, Fine-tuned 0.4365 vs HAR-weekday 0.4402) and h=22 (Fine-tuned 0.5068 vs HAR-weekday 0.5299). On held-out raw QLIKE, GARCH-t achieves the lowest values. A simple 10-parameter linear regression beats or matches the 48M-parameter foundation model across headline metrics at a fraction of the compute cost.
-2. **Calibrated Chronos Competes at Multi-Day Horizons**: When smearing calibration is applied to align variance scales with the conditional arithmetic mean, fine-tuned Chronos-Bolt achieves competitive or slightly lower point estimates at h=5 (0.3697 vs 0.3799) and h=22 (0.3205 vs 0.3491); however, Diebold-Mariano tests against HAR-weekday show p-values of 0.31–0.65 (fail to reject the null of equal predictive accuracy). On ex-shock evaluation, HAR-weekday has lower loss across all horizons, significantly outperforming Fine-tuned Chronos at h=1 (DM p=0.0058).
+1. **The Calendar Baseline (HAR-weekday) Wins on RMSE & Multi-Metric Evaluation**: HAR-weekday achieves the lowest log RMSE across all 6 horizon/group combinations and lowest raw Patton QLIKE on all fit-eligible horizons. On MAE, HAR-weekday wins on all held-out horizons and fit-eligible h=1 (0.4369), while Chronos models achieve lower MAE on fit-eligible h=5 (Zero-shot 0.4303, Fine-tuned 0.4365 vs HAR-weekday 0.4402) and h=22 (Fine-tuned 0.5068 vs HAR-weekday 0.5299). On held-out raw QLIKE, GARCH-t achieves the lowest values. A simple 10-parameter linear regression beats or matches the 48M-parameter foundation model across headline metrics at a fraction of the compute cost.
+2. **Calibrated Chronos Competes at Multi-Day Horizons on Full Sample**: When smearing calibration is applied to align variance scales with the conditional arithmetic mean, fine-tuned Chronos-Bolt achieves slightly lower point estimates on the full sample at h=5 (0.3697 vs 0.3799) and h=22 (0.3205 vs 0.3491); however, Diebold-Mariano tests against HAR-weekday show p-values of 0.31–0.65 (fail to reject the null of equal predictive accuracy). Full-sample results remain primary; in a post-hoc ex-shock sensitivity check, HAR-weekday ranks first across all horizons.
 3. **Directional Accuracy (MDA)**: Chronos leads on fit-eligible h=5 (71.38% vs 68.82%) and h=22 (75.68% vs 71.58%), and held-out h=1 (69.07% vs 68.57%) and h=5 (72.06% vs 69.32%). However, HAR-weekday beats Chronos on held-out h=22 (78.20% vs 77.23%) and is virtually tied at fit-eligible h=1 (70.04% vs 70.42%).
 4. **Typical Days (MdAPE)**: On median percentage error (which is robust to single-day extreme shocks), Chronos yields lower typical errors (31–36% MdAPE vs 37–46% for HAR).
 
@@ -86,24 +86,29 @@ This project investigates a central question in modern quantitative machine lear
 At h=1, HAR-weekday wins on raw Patton QLIKE (0.4383 vs 0.5059 for fine-tuned), MAE (0.4369 vs 0.4429), and log RMSE (0.5920 vs 0.6087).
 On calibrated QLIKE, smearing aligns Chronos with the conditional arithmetic mean, putting fine-tuned Chronos (0.3802) roughly tied with HAR-weekday (0.3758; DM p=0.6471).
 At multi-day horizons (h=5 and h=22), calibrated Chronos achieves slightly lower point estimates (0.3205 vs 0.3491 at h=22) and lower MAE on fit-eligible symbols, but differences are not statistically distinguishable from HAR-weekday (DM p=0.31–0.58).
-Ex-shock evaluation confirms that over 45–50% of test-period calibrated QLIKE occurred on just three days during the October 2025 flash crash.
+Full-sample results remain primary; post-hoc ex-shock evaluation confirms that over 45–50% of test-period calibrated QLIKE occurred on just three days during the October 2025 flash crash.
 This is a forecasting-accuracy study, not a trading strategy.
 
 ![Raw QLIKE for six headline models across three horizons; held-out symbols in the lighter lower panel; bars show 95 percent confidence intervals](docs/img/headline.png)
 
 **Headline Results Table: Patton (2011) QLIKE, Error Metrics, Uncertainty, and Costs.**
-Lower QLIKE and RMSE are better. Intervals use 30-day circular blocks; fine-tuned intervals also resample seeds. Zero-shot is Chronos-Bolt-small. Fine-tuned model is validation-selected (full for h=1/5, LoRA-16 for h=22).
+Lower QLIKE and RMSE are better. Intervals use 30-day circular blocks; fine-tuned intervals also resample seeds. Zero-shot is Chronos-Bolt-small. Fine-tuned model is validation-selected (full for h=1/5, LoRA-16 for h=22). Log RMSE, MAE, and Calibrated Patton QLIKE are the primary headline metrics.
 
 <!-- headline-table-start -->
 '''+headline_table()+'''
 <!-- headline-table-end -->
 
+\\* Note: Raw QLIKE is reported as a secondary column; without smearing calibration to align variance scales with the conditional arithmetic mean, raw Patton QLIKE rewards upward-biased forecasts (e.g., GARCH on held-out assets). Log RMSE, MAE, and Calibrated Patton QLIKE are the primary headline metrics.
+
 Sources: [Stage 7 headline CSV](results/stage7_headline.csv), [baselines](results/stage7_baselines.csv),
 [zero-shot](results/stage7_zero_shot.csv), [fine-tuning](results/stage7_finetune.csv).
 
-### Ex-Shock Robustness (Purging October 10–12 Flash Crash Windows)
+### Post-Hoc Ex-Shock Sensitivity Analysis (Purging October 10–12 Flash Crash Windows)
 
-To evaluate whether performance is driven by tail outliers, the table below re-evaluates all models after purging the October 10–12, 2025 flash crash and any overlapping multi-day target windows ($h=5, 22$).
+> [!NOTE]
+> **Post-hoc sensitivity analysis**: This exclusion window was chosen after inspecting the worst test-period forecasts (the October 10 flash crash); no multiplicity adjustments are applied. **The full-sample results above remain primary.**
+
+To evaluate sensitivity to tail outliers, the table below re-evaluates all models after purging the October 10–12, 2025 flash crash and any overlapping multi-day target windows ($h=5, 22$).
 Models, validation choices, and calibration smearing factors remain frozen.
 
 '''+stage7_ex_shock_table()+'''
@@ -113,6 +118,8 @@ Source: [Stage 7 ex-shock CSV](results/stage7_ex_shock.csv).
 ### Paired Loss Differences (Fine-tuned minus HAR-weekday)
 
 Mean difference in calibrated Patton QLIKE ($d_t = L_{\\text{FT}, t} - L_{\\text{Weekday}, t}$), 95% circular block-bootstrap confidence intervals (30-day blocks, 1,000 replications), and Diebold-Mariano test statistics. Negative values favor Fine-tuned Chronos; positive values favor HAR-weekday.
+
+On fit-eligible $h=1$, the full-sample gap is +0.0044 but ex-shock is +0.0127, i.e. the fine-tuned model lost less than HAR-weekday on the shock dates; this is a single event.
 
 '''+stage7_paired_diff_table()+'''
 
@@ -205,7 +212,7 @@ The Diebold-Mariano implementation uses Newey-West / Bartlett HAC covariance est
 Several baseline comparisons vs HAR-weekday produce extreme p-values ($< 10^{-9}$), including fit-eligible $h=1$ GARCH-t ($p = 3.87 \\times 10^{-14}$) and HAR-RV ($p = 2.45 \\times 10^{-10}$), and held-out $h=1$ Zero-shot ($p = 6.90 \\times 10^{-11}$).
 
 **Are these extreme p-values driven by the shock days?**
-No. When re-estimated on the ex-shock sample (purging October 10–12), these p-values remain equally or more extreme (GARCH-t $p = 1.47 \\times 10^{-18}$, HAR-RV $p = 7.10 \\times 10^{-10}$, Zero-shot $p = 5.90 \\times 10^{-15}$). Purging the flash crash reduces the sample variance of the loss differential $\\text{Var}(d_t)$ without closing the gap, confirming that HAR-weekday's predictive advantage reflects persistent, day-in-day-out calendar volume regularity rather than outlier flash-crash leverage.
+No. When re-estimated on the ex-shock sample (purging October 10–12), these p-values remain equally or more extreme (GARCH-t $p = 1.47 \\times 10^{-18}$, HAR-RV $p = 7.10 \\times 10^{-10}$, Zero-shot $p = 5.90 \\times 10^{-15}$). Purging the flash crash reduces the sample variance of the loss differential $\\text{Var}(d_t)$ without closing the gap, which is consistent with a weekday effect; not separately tested. This gap relates to day-of-week volatility seasonality rather than single-event flash-crash leverage.
 
 ### Appendix: Legacy Orientation QLIKE Numbers (Stages 2–6)
 For historical auditability and full reproducibility of earlier milestones, the legacy orientation QLIKE values ($\\hat{V}/V - \\log(\\hat{V}/V) - 1$) are preserved below:

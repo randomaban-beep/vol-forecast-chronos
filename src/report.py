@@ -32,8 +32,8 @@ def stage7_headline_table() -> str:
     """Generate the Stage 7 headline table with standard Patton QLIKE, CIs, DM tests, and costs."""
     df = pd.read_csv(RESULTS / 'stage7_headline.csv')
     lines = [
-        '| Group | h | Model | log RMSE | MAE | Raw Patton QLIKE [95% CI] | Cal Patton QLIKE [95% CI] | DM p vs Weekday | Params | Train Time |',
-        '| --- | ---: | --- | ---: | ---: | --- | --- | ---: | ---: | ---: |'
+        '| Group | h | Model | log RMSE | MAE | Cal Patton QLIKE [95% CI] | Raw Patton QLIKE* | DM p vs Weekday | Params | Train Time |',
+        '| --- | ---: | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |'
     ]
     for row in df.itertuples():
         p_str = '—' if row.model == 'HAR-weekday' else ('<0.0001' if row.dm_pvalue_vs_weekday < 0.0001 else f'{row.dm_pvalue_vs_weekday:.4f}')
@@ -46,8 +46,8 @@ def stage7_headline_table() -> str:
         t_time = f'{row.fit_seconds:.2f}s'
         lines.append(
             f'| {row.symbol_group} | {row.horizon} | {row.model} | {row.rmse:.4f} | {row.mae:.4f} | '
-            f'{row.qlike_raw:.4f} [{row.qlike_raw_lo:.4f}, {row.qlike_raw_hi:.4f}] | '
             f'{row.qlike:.4f} [{row.qlike_lo:.4f}, {row.qlike_hi:.4f}] | '
+            f'{row.qlike_raw:.4f} | '
             f'{p_str} | {p_count} | {t_time} |'
         )
     return '\n'.join(lines)
