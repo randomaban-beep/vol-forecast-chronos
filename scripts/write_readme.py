@@ -170,6 +170,8 @@ flowchart LR
 ```
 
 - Targets crossing split boundaries are purged. Horizons mean **log of arithmetic mean daily RV**, not an average of logs.
+- Daily RV sums squared five-minute log returns from verified one-minute UTC klines; incomplete or bad days are dropped, never filled.
+- Fit-eligible symbols are BTC, ETH, BNB, XRP, ADA and LTC; the held-out pair is SOL and DOGE (all USDT spot pairs).
 - SOL/DOGE never enter model fitting, checkpoint/family selection or smearing calibration. Their past series may be forecast inputs.
 - Fine-tuned weights freeze before test. Econometric models expand their six-symbol fit and refit every 30 days, using only then-observed targets.
 - Each model/horizon's smearing factor is `mean(exp(target - prediction))` on six-symbol 2024 validation residuals, then frozen. Raw uses factor one.

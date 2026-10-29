@@ -1,0 +1,2 @@
+passed,command,source,status
+82,python -m pytest -q,stage6-tests.log,passed

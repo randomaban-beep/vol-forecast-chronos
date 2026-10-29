@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this study, cite this repository and credit Amazon Chronos and Binance public market data."
+title: "Chronos, meet the calendar: realized-volatility forecasting"
+type: software
+authors:
+  - name: "vol-forecast-chronos contributors"
+repository-code: "https://github.com/randomaban-beep/vol-forecast-chronos"
+license: MIT
+references:
+  - type: software
+    title: "Chronos: pretrained models for time series forecasting"
+    authors:
+      - name: "Amazon Chronos contributors"
+    repository-code: "https://github.com/amazon-science/chronos-forecasting"
+  - type: data
+    title: "Binance public spot market data"
+    authors:
+      - name: "Binance"
+    url: "https://data.binance.vision/"
